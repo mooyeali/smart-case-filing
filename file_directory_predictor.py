@@ -44,6 +44,11 @@ from typing import Optional
 
 import pandas as pd
 
+try:
+    import requests
+except ImportError:
+    requests = None
+
 # ---------------------------------------------------------------------------
 # 全局配置
 # ---------------------------------------------------------------------------
@@ -63,17 +68,111 @@ CLI_TIMEOUT = 180
 # ---------------------------------------------------------------------------
 # 工具函数
 # ---------------------------------------------------------------------------
+def _env(name: str) -> str:
+    """读取环境变量并去除首尾空白。"""
+    return os.getenv(name, "").strip()
+
+
+def _get_model_config(kind: str) -> dict:
+    """读取 OpenAI-compatible 模型配置。
+
+    kind 为 chat 或 vision。专用环境变量优先，缺省回退到通用 AI_*。
+    """
+    prefix = "AI_CHAT" if kind == "chat" else "AI_VISION"
+    base_url = _env(f"{prefix}_BASE_URL") or _env("AI_BASE_URL")
+    api_key = _env(f"{prefix}_API_KEY") or _env("AI_API_KEY")
+    model = _env(f"{prefix}_MODEL") or _env("AI_MODEL")
+    return {
+        "base_url": base_url.rstrip("/"),
+        "api_key": api_key,
+        "model": model,
+    }
+
+
+def _has_openai_config(config: dict) -> bool:
+    return bool(config.get("base_url") and config.get("api_key") and config.get("model"))
+
+
+def _debug_model_error(message: str):
+    if _env("AI_DEBUG") == "1":
+        print(f"[AI_DEBUG] {message}", file=sys.stderr)
+
+
+def _post_openai_compatible(messages: list, config: dict, timeout: int) -> str:
+    """调用 OpenAI-compatible /chat/completions，返回 message.content。"""
+    if requests is None:
+        _debug_model_error("requests is not installed; install with: pip install requests")
+        return ""
+    url = f"{config['base_url']}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {config['api_key']}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": config["model"],
+        "messages": messages,
+    }
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        if resp.status_code >= 400:
+            _debug_model_error(f"HTTP {resp.status_code}: {resp.text[:500]}")
+            return ""
+        data = resp.json()
+        return data.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
+    except requests.RequestException as e:
+        _debug_model_error(f"request failed: {e}")
+        return ""
+    except Exception as e:
+        _debug_model_error(f"response parse failed: {e}")
+        return ""
+
+
+def _run_openai_compatible_chat(prompt: str, system: Optional[str],
+                                config: dict, timeout: int) -> str:
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    return _post_openai_compatible(messages, config, timeout)
+
+
+def _run_openai_compatible_vision(prompt: str, image_paths: list,
+                                  config: dict, timeout: int) -> str:
+    content = [{"type": "text", "text": prompt}]
+    for p in image_paths:
+        try:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": _image_to_base64(Path(p))},
+            })
+        except Exception as e:
+            _debug_model_error(f"image encode failed: {p}: {e}")
+            return ""
+    return _post_openai_compatible([{"role": "user", "content": content}], config, timeout)
+
+
 def _run_zai_chat(prompt: str, system: Optional[str] = None,
                   thinking: bool = False, timeout: int = CLI_TIMEOUT) -> str:
+    """调用文本模型，优先使用 OpenAI-compatible HTTP API，未配置时回退 z-ai CLI。"""
+    # 安全清洗：去除 null 字节等会导致 subprocess/HTTP 请求异常的字符
+    prompt = (prompt or "").replace("\x00", "")
+    system = (system or "").replace("\x00", "") if system else None
+
+    config = _get_model_config("chat")
+    if _has_openai_config(config):
+        return _run_openai_compatible_chat(prompt, system, config, timeout)
+
+    return _run_zai_chat_cli(prompt, system=system, thinking=thinking, timeout=timeout)
+
+
+def _run_zai_chat_cli(prompt: str, system: Optional[str] = None,
+                      thinking: bool = False, timeout: int = CLI_TIMEOUT) -> str:
     """调用 z-ai chat CLI，返回模型回复文本。
 
     为避免命令行参数过长（ARG_MAX 限制），当 prompt 较长时写入临时文件，
     再用 shell 的 $(cat file) 方式注入。这里改用更稳妥的 Node.js 内联脚本
     调用 z-ai-web-dev-sdk，直接读取文件内容作为 prompt。
     """
-    # 安全清洗：去除 null 字节等会导致 subprocess 报错的字符
-    prompt = (prompt or "").replace("\x00", "")
-    system = (system or "").replace("\x00", "") if system else None
     out_file = TMP_DIR / f"chat_{int(time.time() * 1000)}.json"
     # 短 prompt 直接用命令行参数；长 prompt 写入文件后用 cat 注入
     if len(prompt) < 3000 and (not system or len(system) < 3000):
@@ -124,6 +223,17 @@ def _run_zai_chat(prompt: str, system: Optional[str] = None,
 
 def _run_zai_vision(prompt: str, image_paths: list, thinking: bool = False,
                     timeout: int = CLI_TIMEOUT) -> str:
+    """调用视觉模型，优先使用 OpenAI-compatible HTTP API，未配置时回退 z-ai CLI。"""
+    prompt = (prompt or "").replace("\x00", "")
+    config = _get_model_config("vision")
+    if _has_openai_config(config):
+        return _run_openai_compatible_vision(prompt, image_paths, config, timeout)
+
+    return _run_zai_vision_cli(prompt, image_paths, thinking=thinking, timeout=timeout)
+
+
+def _run_zai_vision_cli(prompt: str, image_paths: list, thinking: bool = False,
+                        timeout: int = CLI_TIMEOUT) -> str:
     """调用 z-ai vision CLI 分析一张或多张图片，返回模型回复文本。"""
     if not image_paths:
         return ""
