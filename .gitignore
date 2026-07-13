@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+
+.DS_Store
+.idea/
+.codegraph/
+
+_tmp_predict/
+scripts/_tmp_predict/
