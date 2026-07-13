@@ -1,0 +1,191 @@
+{
+  "title": "OpenAI-compatible ???????????",
+  "status": "PASS",
+  "input": {
+    "test_file": "test-reports/full-chain-input.txt",
+    "test_file_content": "民事起诉状\n\n原告：张三，男，1985年1月1日出生，住北京市朝阳区。\n被告：李四，男，1982年5月6日出生，住北京市海淀区。\n\n诉讼请求：\n1. 判令被告偿还借款本金人民币50000元；\n2. 判令被告支付逾期利息；\n3. 本案诉讼费用由被告承担。\n\n事实与理由：\n2025年3月1日，被告因资金周转需要向原告借款人民币50000元，并出具借条，约定于2025年6月1日前归还。\n到期后，原告多次催要，被告至今未归还。为维护原告合法权益，特向人民法院提起诉讼。\n\n此致\n北京市朝阳区人民法院\n\n具状人：张三\n2026年7月13日\n",
+    "command": [
+      "C:\\Python314\\python.exe",
+      "file_directory_predictor.py",
+      "test-reports/full-chain-input.txt",
+      "--catalog",
+      "catalog-mapping.xlsx",
+      "--json"
+    ],
+    "cwd": "C:\\Users\\mooyea\\Desktop\\AI",
+    "env": {
+      "AI_BASE_URL": "https://apihub.agnes-ai.com/v1",
+      "AI_API_KEY": "sk-cOlgZ...Sr2RWp",
+      "AI_MODEL": "agnes-2.0-flash",
+      "AI_DEBUG": "1",
+      "PYTHONIOENCODING": "utf-8"
+    }
+  },
+  "http_calls": [
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://apihub.agnes-ai.com/v1/chat/completions",
+        "headers": {
+          "Authorization": "Bearer sk-cOlgZ...Sr2RWp",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "model": "agnes-2.0-flash",
+          "messages": [
+            {
+              "role": "system",
+              "content": "你是法院卷宗编目专家，精通各类案件（刑事/民事/行政/执行/再审）的卷宗材料分类规则。你能根据文书内容准确判断其所属的案件类型、卷宗（正卷/副卷）、二级目录与材料类别。"
+            },
+            {
+              "role": "user",
+              "content": "请分析以下从文件中提取的文本内容，按如下 JSON 格式严格输出（不要输出 JSON 以外的内容）：\n{\n  \"doc_type_guess\": \"推测的文书类型，如 起诉书/判决书/裁定书/调解书/立案登记表/案件审判流程管理信息表/送达回证/庭审笔录/合议庭评议笔录/鉴定意见/委托书/证据 等\",\n  \"volume_guess\": \"正卷 或 副卷 或 未知\",\n  \"case_clues\": \"案件类型线索关键词，如 刑事/民事/行政/执行/再审/一审/二审 等\",\n  \"key_phrases\": \"内容中能体现文书性质的关键短语，逗号分隔\",\n  \"summary\": \"一句话概括该文件内容\",\n  \"confidence\": \"high/medium/low\"\n}\n文件名: full-chain-input.txt\n文件类型: text\n文本内容:\n民事起诉状\n\n原告：张三，男，1985年1月1日出生，住北京市朝阳区。\n被告：李四，男，1982年5月6日出生，住北京市海淀区。\n\n诉讼请求：\n1. 判令被告偿还借款本金人民币50000元；\n2. 判令被告支付逾期利息；\n3. 本案诉讼费用由被告承担。\n\n事实与理由：\n2025年3月1日，被告因资金周转需要向原告借款人民币50000元，并出具借条，约定于2025年6月1日前归还。\n到期后，原告多次催要，被告至今未归还。为维护原告合法权益，特向人民法院提起诉讼。\n\n此致\n北京市朝阳区人民法院\n\n具状人：张三\n2026年7月13日\n注意：只输出 JSON，不要有任何解释性文字。"
+            }
+          ]
+        },
+        "timeout": 180
+      },
+      "response": {
+        "status_code": 200,
+        "headers_subset": {
+          "content-type": "application/json",
+          "x-request-id": null
+        },
+        "text": "{\"id\":\"chatcmpl-91071c69eccc4070\",\"created\":1783943335,\"model\":\"agnes-2.0-flash\",\"object\":\"chat.completion\",\"system_fingerprint\":\"vllm-0.21.0-tp2-84122c74\",\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"content\":\"{\\n  \\\"doc_type_guess\\\": \\\"民事起诉状\\\",\\n  \\\"volume_guess\\\": \\\"正卷\\\",\\n  \\\"case_clues\\\": \\\"民事\\\",\\n  \\\"key_phrases\\\": \\\"民事起诉状, 借款本金, 借条, 诉讼费用\\\",\\n  \\\"summary\\\": \\\"原告张三因被告李四未归还5万元借款及利息，向法院提起民事诉讼。\\\",\\n  \\\"confidence\\\": \\\"high\\\"\\n}\",\"role\":\"assistant\",\"provider_specific_fields\":{\"refusal\":null,\"reasoning\":null}},\"provider_specific_fields\":{\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}}],\"usage\":{\"completion_tokens\":88,\"prompt_tokens\":691,\"total_tokens\":779}}",
+        "json": {
+          "id": "chatcmpl-91071c69eccc4070",
+          "created": 1783943335,
+          "model": "agnes-2.0-flash",
+          "object": "chat.completion",
+          "system_fingerprint": "vllm-0.21.0-tp2-84122c74",
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\n  \"doc_type_guess\": \"民事起诉状\",\n  \"volume_guess\": \"正卷\",\n  \"case_clues\": \"民事\",\n  \"key_phrases\": \"民事起诉状, 借款本金, 借条, 诉讼费用\",\n  \"summary\": \"原告张三因被告李四未归还5万元借款及利息，向法院提起民事诉讼。\",\n  \"confidence\": \"high\"\n}",
+                "role": "assistant",
+                "provider_specific_fields": {
+                  "refusal": null,
+                  "reasoning": null
+                }
+              },
+              "provider_specific_fields": {
+                "stop_reason": null,
+                "token_ids": null,
+                "routed_experts": null
+              }
+            }
+          ],
+          "usage": {
+            "completion_tokens": 88,
+            "prompt_tokens": 691,
+            "total_tokens": 779
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "url": "https://apihub.agnes-ai.com/v1/chat/completions",
+        "headers": {
+          "Authorization": "Bearer sk-cOlgZ...Sr2RWp",
+          "Content-Type": "application/json"
+        },
+        "json": {
+          "model": "agnes-2.0-flash",
+          "messages": [
+            {
+              "role": "system",
+              "content": "你是法院卷宗编目专家，精通各类案件（刑事/民事/行政/执行/再审）的卷宗材料分类规则。你能根据文书内容准确判断其所属的案件类型、卷宗（正卷/副卷）、二级目录与材料类别。"
+            },
+            {
+              "role": "user",
+              "content": "你是法院卷宗编目匹配专家。下面给出一份文件的【分析画像】与【候选编目条目】。\n请根据文件画像，从候选条目中选出【最匹配】的一条（只能从候选编号中选），并给出理由。\n\n严格按如下 JSON 格式输出（不要输出 JSON 以外的任何内容）：\n{\n  \"selected_index\": \"候选编号(数字)\",\n  \"case_type\": \"对应的案件类型\",\n  \"volume\": \"正卷 或 副卷\",\n  \"second_level_directory\": \"对应的二级目录名称\",\n  \"material_category\": \"对应的材料类别\",\n  \"catalog_name_example\": \"对应的编目名称示例\",\n  \"confidence\": \"high/medium/low\",\n  \"reasoning\": \"一句话说明为什么这样匹配\"\n}\n\n=== 文件分析画像 ===\n文件名: full-chain-input.txt\n文件类型: text\n推测文书类型: 民事起诉状\n推测卷宗: 正卷\n案件线索: 民事\n画像置信度: medium\n关键信息:\n关键短语: 民事起诉状, 借款本金, 借条, 诉讼费用\n内容摘要: 原告张三因被告李四未归还5万元借款及利息，向法院提起民事诉讼。\n\n文本预览:\n民事起诉状\n\n原告：张三，男，1985年1月1日出生，住北京市朝阳区。\n被告：李四，男，1982年5月6日出生，住北京市海淀区。\n\n诉讼请求：\n1. 判令被告偿还借款本金人民币50000元；\n2. 判令被告支付逾期利息；\n3. 本案诉讼费用由被告承担。\n\n事实与理由：\n2025年3月1日，被告因资金周转需要向原告借款人民币50000元，并出具借条，约定于2025年6月1日前归还。\n到期后，原告多次催要，被告至今未归还。为维护原告合法权益，特向人民法院提起诉讼。\n\n此致\n北京市朝阳区人民法院\n\n具状人：张三\n2026年7月13日\n\n=== 候选编目条目（共 25 条）===\n[1] 案件类型:刑事一审案件编目规则 | 卷宗:正卷 | 二级目录:起诉书及相关材料 | 材料类别:刑事附带民事起诉状 | 示例:刑事附带民事起诉状（X市检刑诉〔2026〕XX号）\n[2] 案件类型:刑事一审案件编目规则 | 卷宗:正卷 | 二级目录:开庭通知书、公告、传票、提押票、换押证等材料 | 材料类别:刑事附带民事诉讼通知书 | 示例:刑事附带民事诉讼通知书\n[3] 案件类型:刑事一审案件编目规则 | 卷宗:正卷 | 二级目录:送达地址确认书、送达回证或其他送达凭证 | 材料类别:刑事附带民事起诉状送达笔录 | 示例:刑事附带民事起诉状送达笔录20260427\n[4] 案件类型:刑事申诉再审审查案件编目规则 | 卷宗:正卷 | 二级目录:赔偿协议、附带民事诉讼谅解书 | 材料类别:附带民事诉讼谅解书 | 示例:附带民事诉讼谅解书\n[5] 案件类型:刑事一审案件编目规则 | 卷宗:正卷 | 二级目录:赔偿协议、附带民事诉讼谅解书 | 材料类别:赔偿协议、附带民事诉讼谅解书 | 示例:赔偿协议（和解协议）\n[6] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:赔偿协议、附带民事诉讼谅解书 | 材料类别:赔偿协议、附带民事诉讼谅解书 | 示例:赔偿协议\n[7] 案件类型:刑事再审案件编目规则 | 卷宗:正卷 | 二级目录:赔偿协议、附带民事诉讼谅解书 | 材料类别:赔偿协议、附带民事诉讼谅解书 | 示例:赔偿协议\n[8] 案件类型:民事二审案件编目规则 | 卷宗:正卷 | 二级目录:交纳诉讼费用相关材料 | 材料类别:交纳诉讼费用材料 | 示例:交纳诉讼费用材料\n[9] 案件类型:民事二审案件编目规则 | 卷宗:正卷 | 二级目录:交纳诉讼费用相关材料 | 材料类别:退还诉讼费用材料 | 示例:退还诉讼费用通知书\n[10] 案件类型:民事二审案件编目规则 | 卷宗:副卷 | 二级目录:审（签）批材料 | 材料类别:退诉讼费用审批表 | 示例:退诉讼费用审批表\n[11] 案件类型:民事二审案件编目规则 | 卷宗:正卷 | 二级目录:交纳诉讼费用相关材料 | 材料类别:诉讼费用减、免、缓材料 | 示例:上诉人张三缓交诉讼费申请书\n[12] 案件类型:刑事一审案件编目规则 | 卷宗:正卷 | 二级目录:附带民事公益诉讼公告等材料 | 材料类别:附带民事公益诉讼公告等材料 | 示例:附带民事公益诉讼公告\n[13] 案件类型:刑事一审案件编目规则 | 卷宗:正卷 | 二级目录:赔偿协议、附带民事诉讼谅解书 | 材料类别: | 示例:附带民事诉讼谅解书（刑事谅解书）\n[14] 案件类型:刑事一审案件编目规则 | 卷宗:正卷 | 二级目录:附带民事（公益）诉讼调解协议、调解公告及多元纠纷化解相关材料 | 材料类别:附带民事调解笔录 | 示例:附带民事调解笔录20260427\n[15] 案件类型:刑事一审案件编目规则 | 卷宗:正卷 | 二级目录:本院法律文书正本 | 材料类别:附带民事调解书/协议书/裁定书 | 示例:（2026）XX刑初XX号刑事附带民事调解书/协议书/裁定书\n[16] 案件类型:刑事一审案件编目规则 | 卷宗:副卷 | 二级目录:本院法律文书签发稿 | 材料类别:刑事附带民事调解书原本 | 示例:刑事附带民事调解书原本\n[17] 案件类型:刑事一审案件编目规则 | 卷宗:副卷 | 二级目录:本院法律文书签发稿 | 材料类别:附带民事调解书/协议书/裁定书签发稿 | 示例:附带民事调解书/协议书/裁定书签发稿\n[18] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:赔偿协议、附带民事诉讼谅解书 | 材料类别: | 示例:附带民事诉讼谅解书\n[19] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:检察员出庭意见书、公益诉讼起诉人的上一级人民检察院意见等材料、被告人的供述和辩解、辩护词、附带民事（公益）诉讼代理词 | 材料类别:附带民事（公益）诉讼代理词 | 示例:附带民事（公益）诉讼代理词\n[20] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:附带民事（公益）诉讼调解协议、调解公告及多元纠纷化解相关材料 | 材料类别:刑事附带民事调解笔录 | 示例:刑事附带民事调解笔录20260427\n[21] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:撤诉申请书 | 材料类别:刑事附带民事撤诉材料 | 示例:刑事附带民事撤诉材料\n[22] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:本院法律文书正本 | 材料类别:刑事附带民事调解书正卷本 | 示例:(202X)XX01刑初456号刑事附带民事调解书\n[23] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:本院法律文书正本 | 材料类别:刑事附带民事协议书正卷本 | 示例:(202X)XX01刑初456号刑事附带民事协议书\n[24] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:本院法律文书正本 | 材料类别:刑事附带民事裁定书正卷本 | 示例:(202X)XX01刑初456号刑事附带民事裁定书\n[25] 案件类型:刑事二审案件编目规则 | 卷宗:正卷 | 二级目录:本院法律文书正本 | 材料类别:刑事附带民事其他法律文书正卷本 | 示例:(202X)XX01刑初456号刑事附带民事其他法律文书\n\n匹配要求：\n1. selected_index 必须是上面候选列表中的编号；\n2. 其余字段须与该编号对应的条目完全一致；\n3. 若所有候选都不匹配，confidence 设为 low 并在 reasoning 中说明。\n注意：只输出 JSON。"
+            }
+          ]
+        },
+        "timeout": 180
+      },
+      "response": {
+        "status_code": 200,
+        "headers_subset": {
+          "content-type": "application/json",
+          "x-request-id": null
+        },
+        "text": "{\"id\":\"chatcmpl-a6b59e8aea4e4cdf\",\"created\":1783943345,\"model\":\"agnes-2.0-flash\",\"object\":\"chat.completion\",\"system_fingerprint\":\"vllm-0.21.0-tp2-84122c74\",\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"content\":\"{\\n  \\\"selected_index\\\": \\\"1\\\",\\n  \\\"case_type\\\": \\\"民事一审案件编目规则\\\",\\n  \\\"volume\\\": \\\"正卷\\\",\\n  \\\"second_level_directory\\\": \\\"起诉状及相关材料\\\",\\n  \\\"material_category\\\": \\\"民事起诉状\\\",\\n  \\\"catalog_name_example\\\": \\\"民事起诉状（张三诉李四民间借贷纠纷）\\\",\\n  \\\"confidence\\\": \\\"low\\\",\\n  \\\"reasoning\\\": \\\"候选列表全部为刑事案件编目规则，无直接匹配的民事起诉状条目，但根据内容性质（起诉状）和卷宗属性（正卷），在缺乏完美选项时，选取结构最接近的[1]作为近似匹配，并修正其为民事一审以符合画像事实。\\\"\\n}\",\"role\":\"assistant\",\"provider_specific_fields\":{\"refusal\":null,\"reasoning\":null}},\"provider_specific_fields\":{\"stop_reason\":null,\"token_ids\":null,\"routed_experts\":null}}],\"usage\":{\"completion_tokens\":152,\"prompt_tokens\":2278,\"total_tokens\":2430}}",
+        "json": {
+          "id": "chatcmpl-a6b59e8aea4e4cdf",
+          "created": 1783943345,
+          "model": "agnes-2.0-flash",
+          "object": "chat.completion",
+          "system_fingerprint": "vllm-0.21.0-tp2-84122c74",
+          "choices": [
+            {
+              "finish_reason": "stop",
+              "index": 0,
+              "message": {
+                "content": "{\n  \"selected_index\": \"1\",\n  \"case_type\": \"民事一审案件编目规则\",\n  \"volume\": \"正卷\",\n  \"second_level_directory\": \"起诉状及相关材料\",\n  \"material_category\": \"民事起诉状\",\n  \"catalog_name_example\": \"民事起诉状（张三诉李四民间借贷纠纷）\",\n  \"confidence\": \"low\",\n  \"reasoning\": \"候选列表全部为刑事案件编目规则，无直接匹配的民事起诉状条目，但根据内容性质（起诉状）和卷宗属性（正卷），在缺乏完美选项时，选取结构最接近的[1]作为近似匹配，并修正其为民事一审以符合画像事实。\"\n}",
+                "role": "assistant",
+                "provider_specific_fields": {
+                  "refusal": null,
+                  "reasoning": null
+                }
+              },
+              "provider_specific_fields": {
+                "stop_reason": null,
+                "token_ids": null,
+                "routed_experts": null
+              }
+            }
+          ],
+          "usage": {
+            "completion_tokens": 152,
+            "prompt_tokens": 2278,
+            "total_tokens": 2430
+          }
+        }
+      }
+    }
+  ],
+  "script_return": {
+    "returncode": 0,
+    "stdout_json": {
+      "file_path": "test-reports\\full-chain-input.txt",
+      "file_type": "text",
+      "predicted_case_type": "刑事一审案件编目规则",
+      "predicted_volume": "正卷",
+      "predicted_second_level_directory": "起诉书及相关材料",
+      "predicted_material_category": "刑事附带民事起诉状",
+      "predicted_catalog_example": "刑事附带民事起诉状（X市检刑诉〔2026〕XX号）",
+      "confidence": "low",
+      "reasoning": "候选列表全部为刑事案件编目规则，无直接匹配的民事起诉状条目，但根据内容性质（起诉状）和卷宗属性（正卷），在缺乏完美选项时，选取结构最接近的[1]作为近似匹配，并修正其为民事一审以符合画像事实。",
+      "vlm_analysis": {
+        "available": false,
+        "reason": "无可分析图像"
+      },
+      "llm_analysis": {
+        "doc_type_guess": "民事起诉状",
+        "volume_guess": "正卷",
+        "case_clues": "民事",
+        "key_phrases": "民事起诉状, 借款本金, 借条, 诉讼费用",
+        "summary": "原告张三因被告李四未归还5万元借款及利息，向法院提起民事诉讼。",
+        "confidence": "high",
+        "available": true
+      },
+      "matched_entries": [
+        {
+          "case_type": "刑事一审案件编目规则",
+          "volume": "正卷",
+          "second_level_directory": "起诉书及相关材料",
+          "constraint": "必选",
+          "material_category": "刑事附带民事起诉状",
+          "catalog_name_example": "刑事附带民事起诉状（X市检刑诉〔2026〕XX号）"
+        }
+      ]
+    },
+    "stdout_parse_error": null,
+    "stderr": "[加载编目规则] catalog-mapping.xlsx\n  共 3860 条规则，13 种案件类型，1135 种材料类别\n"
+  }
+}
