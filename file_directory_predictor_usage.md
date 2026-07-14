@@ -181,6 +181,17 @@ JSON 输出：
 python file_directory_predictor.py ./sample.pdf --catalog ./catalog-mapping.xlsx --json
 ```
 
+保存结果和日志到指定文件：
+
+```bash
+python file_directory_predictor.py ./sample.pdf --catalog ./catalog-mapping.xlsx --json --output ./result.json --log ./run.log
+```
+
+如果不显式指定 `--output` 和 `--log`，程序会默认保存到脚本所在目录：
+
+- `file_directory_predictor_output.txt`：运行结果，也就是原本输出到 stdout 的内容
+- `file_directory_predictor.log`：运行日志，也就是原本输出到 stderr 的内容
+
 输出内容包括：
 
 - 文件路径
@@ -616,6 +627,17 @@ Batch JSON output:
 ```bash
 python file_directory_predictor.py --batch ./input-files --catalog ./catalog-mapping.xlsx --json
 ```
+
+Save output and logs to explicit files:
+
+```bash
+python file_directory_predictor.py ./sample.pdf --catalog ./catalog-mapping.xlsx --json --output ./result.json --log ./run.log
+```
+
+If `--output` and `--log` are not provided, the program writes default files under the script directory:
+
+- `file_directory_predictor_output.txt`: runtime output, equivalent to stdout
+- `file_directory_predictor.log`: runtime logs, equivalent to stderr
 
 The current batch mode does not recurse into subdirectories.
 

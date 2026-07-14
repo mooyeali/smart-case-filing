@@ -22,6 +22,7 @@
 用法:
   python3 file_directory_predictor.py <文件路径> [--catalog <编目xlsx>] [--json]
   python3 file_directory_predictor.py --batch <目录> [--catalog <编目xlsx>]
+  python3 file_directory_predictor.py <文件路径> --output <结果文件> --log <日志文件>
 
 示例:
   python3 file_directory_predictor.py /path/to/起诉书.pdf
@@ -30,6 +31,7 @@
 
 import argparse
 import base64
+import contextlib
 import json
 import os
 import re
@@ -52,17 +54,20 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # 全局配置
 # ---------------------------------------------------------------------------
-PROJECT_ROOT = Path("/home/z/my-project")
-DEFAULT_CATALOG = PROJECT_ROOT / "upload" / "6a54a3afc78fec0fe9e6aa28_catalog-mapping.xlsx"
+PROJECT_ROOT = Path("/Users/mooye/python project/smart-case-filing")
+PROGRAM_DIR = Path(__file__).resolve().parent
+DEFAULT_CATALOG = PROJECT_ROOT / "catalog-mapping.xlsx"
 TMP_DIR = PROJECT_ROOT / "scripts" / "_tmp_predict"
 TMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # VLM 分析时最多渲染的 PDF 页数（控制成本）
-MAX_PDF_PAGES_FOR_VLM = 3
+MAX_PDF_PAGES_FOR_VLM = 10
 # 提取文本送入 LLM 的最大字符数
 MAX_TEXT_CHARS = 6000
 # CLI 调用超时（秒）
 CLI_TIMEOUT = 180
+DEFAULT_OUTPUT_FILE = "file_directory_predictor_output.txt"
+DEFAULT_LOG_FILE = "file_directory_predictor.log"
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +101,38 @@ def _has_openai_config(config: dict) -> bool:
 def _debug_model_error(message: str):
     if _env("AI_DEBUG") == "1":
         print(f"[AI_DEBUG] {message}", file=sys.stderr)
+
+
+class _Tee:
+    """Write a stream to both the original console stream and a file."""
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, data: str):
+        for stream in self.streams:
+            stream.write(data)
+        return len(data)
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
+
+
+@contextlib.contextmanager
+def _save_cli_streams(output_path: Path, log_path: Path):
+    output_path = Path(output_path)
+    log_path = Path(log_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    with output_path.open("w", encoding="utf-8") as output_file, \
+            log_path.open("w", encoding="utf-8") as log_file, \
+            contextlib.redirect_stdout(_Tee(original_stdout, output_file)), \
+            contextlib.redirect_stderr(_Tee(original_stderr, log_file)):
+        yield
 
 
 def _post_openai_compatible(messages: list, config: dict, timeout: int) -> str:
@@ -1025,46 +1062,52 @@ def main():
     parser.add_argument("--catalog", default=str(DEFAULT_CATALOG),
                         help=f"编目规则 xlsx 路径（默认 {DEFAULT_CATALOG}）")
     parser.add_argument("--json", action="store_true", help="以 JSON 输出结果")
+    parser.add_argument("--output", help="运行结果保存路径（默认程序目录下 file_directory_predictor_output.txt）")
+    parser.add_argument("--log", help="运行日志保存路径（默认程序目录下 file_directory_predictor.log）")
     args = parser.parse_args()
 
     if not args.file and not args.batch:
         parser.error("请提供文件路径或 --batch 目录")
 
-    catalog_path = Path(args.catalog)
-    if not catalog_path.exists():
-        print(f"[错误] 编目规则文件不存在: {catalog_path}", file=sys.stderr)
-        sys.exit(1)
+    output_path = Path(args.output) if args.output else PROGRAM_DIR / DEFAULT_OUTPUT_FILE
+    log_path = Path(args.log) if args.log else PROGRAM_DIR / DEFAULT_LOG_FILE
 
-    print(f"[加载编目规则] {catalog_path}", file=sys.stderr)
-    catalog = CatalogLoader(catalog_path).load()
-    print(f"  共 {len(catalog.entries)} 条规则，{len(catalog.case_types)} 种案件类型，"
-          f"{len(catalog.categories)} 种材料类别", file=sys.stderr)
+    with _save_cli_streams(output_path, log_path):
+        catalog_path = Path(args.catalog)
+        if not catalog_path.exists():
+            print(f"[错误] 编目规则文件不存在: {catalog_path}", file=sys.stderr)
+            sys.exit(1)
 
-    predictor = DirectoryPredictor(catalog)
+        print(f"[加载编目规则] {catalog_path}", file=sys.stderr)
+        catalog = CatalogLoader(catalog_path).load()
+        print(f"  共 {len(catalog.entries)} 条规则，{len(catalog.case_types)} 种案件类型，"
+              f"{len(catalog.categories)} 种材料类别", file=sys.stderr)
 
-    if args.batch:
-        batch_dir = Path(args.batch)
-        results = []
-        files = sorted([p for p in batch_dir.iterdir() if p.is_file()])
-        for f in files:
-            print(f"\n[处理] {f.name}", file=sys.stderr)
-            try:
-                r = predictor.predict(f)
-                results.append(r.to_dict())
-                _print_result(r, as_json=args.json)
-            except Exception as e:
-                print(f"  [失败] {e}", file=sys.stderr)
-        # 批量结果汇总
-        if args.json:
-            print(json.dumps(results, ensure_ascii=False, indent=2))
-        return
+        predictor = DirectoryPredictor(catalog)
 
-    file_path = Path(args.file)
-    if not file_path.exists():
-        print(f"[错误] 文件不存在: {file_path}", file=sys.stderr)
-        sys.exit(1)
-    result = predictor.predict(file_path)
-    _print_result(result, as_json=args.json)
+        if args.batch:
+            batch_dir = Path(args.batch)
+            results = []
+            files = sorted([p for p in batch_dir.iterdir() if p.is_file()])
+            for f in files:
+                print(f"\n[处理] {f.name}", file=sys.stderr)
+                try:
+                    r = predictor.predict(f)
+                    results.append(r.to_dict())
+                    _print_result(r, as_json=args.json)
+                except Exception as e:
+                    print(f"  [失败] {e}", file=sys.stderr)
+            # 批量结果汇总
+            if args.json:
+                print(json.dumps(results, ensure_ascii=False, indent=2))
+            return
+
+        file_path = Path(args.file)
+        if not file_path.exists():
+            print(f"[错误] 文件不存在: {file_path}", file=sys.stderr)
+            sys.exit(1)
+        result = predictor.predict(file_path)
+        _print_result(result, as_json=args.json)
 
 
 if __name__ == "__main__":
