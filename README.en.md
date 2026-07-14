@@ -16,7 +16,7 @@ The current project is centered on a single Python script. It is suitable for lo
 - Supports OpenAI-compatible HTTP APIs through environment variables for `base_url`, `api_key`, and `model`.
 - Falls back to the legacy `z-ai` CLI when the HTTP model configuration is incomplete.
 - Can save stdout and stderr to separate files for auditing and review.
-- The batch-resumable agent mode supports execution traces, run manifests, low-confidence review, partial resume, and retry policy.
+- The operational batch agent mode supports execution traces, run manifests, low-confidence review, partial resume, retry CLI options, model preflight, and review decision records.
 
 ## Workflow
 

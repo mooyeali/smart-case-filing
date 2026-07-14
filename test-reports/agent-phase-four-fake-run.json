@@ -1,0 +1,41 @@
+{
+  "preflight_command": "python file_directory_predictor.py --agent --agent-preflight --json",
+  "preflight_expected": {
+    "http": {
+      "configured": false,
+      "api_key_configured": false
+    },
+    "legacy_z_ai": {
+      "available": false
+    },
+    "selected_mode": "unconfigured"
+  },
+  "batch_command": "python file_directory_predictor.py --batch ./test-reports/agent-phase-four-input --catalog ./catalog-mapping.xlsx --agent --trace ./agent-runs/phase-four-fake --review-output ./agent-runs/phase-four-fake-reviews --agent-retry-attempts 2 --agent-retry-errors temporary,unavailable --json",
+  "batch_expected": {
+    "status_counts": {
+      "COMPLETED": 1,
+      "NEEDS_REVIEW": 1,
+      "FAILED": 1
+    },
+    "review_index": "./agent-runs/phase-four-fake-reviews/index.json"
+  },
+  "resume_command": "python file_directory_predictor.py --agent --resume ./agent-runs/phase-four-fake/manifest.json --catalog ./catalog-mapping.xlsx --json",
+  "resume_expected": {
+    "persists_manifest": true,
+    "persists_outputs": true,
+    "persists_review_index": true
+  },
+  "review_decision_command": "python file_directory_predictor.py --agent --resume ./agent-runs/phase-four-fake/manifest.json --review-decision ./decision.json --json",
+  "review_decision_expected": {
+    "agent_state": "REVIEW_DECISION_RECORDED",
+    "manifest_fields": [
+      "decision",
+      "decision_path",
+      "reviewed_at"
+    ]
+  },
+  "test_commands": [
+    "python -m unittest discover -s tests",
+    "python file_directory_predictor.py --help"
+  ]
+}

@@ -233,10 +233,11 @@ python file_directory_predictor.py \
   --catalog ./catalog-mapping.xlsx \
   --agent \
   --trace ./agent-runs/demo \
+  --review-output ./agent-runs/demo/reviews \
   --json
 ```
 
-Batch mode only processes direct files in the specified directory. In batch agent mode, `--trace` is treated as the run directory and the run writes:
+Batch mode only processes direct files in the specified directory. In batch agent mode, `--trace` is treated as the run directory. If `--review-output` points to a directory, review packages and `index.json` are written there. The run writes:
 
 ```text
 agent-runs/<run_id>/
@@ -253,8 +254,14 @@ Arguments:
 | --- | --- |
 | `--agent` | Enables the agent state machine. |
 | `--trace <path>` | In single-file mode, writes a JSONL trace; in batch mode, acts as the run directory. |
-| `--review-output <path>` | Writes a human review JSON package when the state is `NEEDS_REVIEW` or `FAILED`. |
+| `--review-output <path>` | In single-file mode, a review JSON file; in batch mode, a review directory. |
 | `--resume <trace-or-manifest>` | Resumes from a single-file trace or batch manifest. Terminal states are not rerun; partial states attempt to continue from the next step. |
+| `--agent-retry-attempts <n>` | Maximum tool attempts. Default: `1`. |
+| `--agent-retry-delay <seconds>` | Initial retry delay. Default: `0`. |
+| `--agent-retry-backoff <factor>` | Retry backoff factor. Default: `2.0`. |
+| `--agent-retry-errors <keywords>` | Comma-separated retryable error substrings. |
+| `--agent-preflight` | Prints model configuration status without network calls or input files. |
+| `--review-decision <json>` | Records a human review decision and updates the run manifest. |
 
 Each trace JSONL line is one step record:
 
@@ -275,6 +282,17 @@ The review package contains `file_path`, `agent_state`, `confidence`, `reasoning
 
 For batch runs, `manifest.json` records each file's state, confidence, trace, review, output, and error summary. `reviews/index.json` indexes all `NEEDS_REVIEW` and `FAILED` files for centralized review.
 
+Model configuration preflight:
+
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --agent-preflight \
+  --json
+```
+
+Preflight checks whether `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` are complete, and whether a legacy `z-ai` executable exists on PATH. It does not call remote model APIs.
+
 Resume example:
 
 ```bash
@@ -294,11 +312,36 @@ python file_directory_predictor.py \
   --json
 ```
 
+Batch resume persists resumed file outputs, review packages, manifest updates, and the review index. Terminal files in `COMPLETED`, `NEEDS_REVIEW`, or `FAILED` are not rerun.
+
+Review decision example:
+
+```json
+{
+  "file_id": "review-123",
+  "file_path": "input/review.txt",
+  "decision": "approved",
+  "final_prediction": {},
+  "reviewer": "reviewer-a",
+  "notes": "confirmed"
+}
+```
+
+Record the decision:
+
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --resume ./agent-runs/demo/manifest.json \
+  --review-decision ./decision.json \
+  --json
+```
+
 Phase-three behavior and limitations:
 
 - Batch agent mode is supported, but still only processes direct files in the target directory.
 - Partial resume is supported; if trace summaries are insufficient to resume safely, the command returns a clear failed response.
-- Tool calls use a retry policy. The default remains one attempt; tests and future callers can configure attempts, backoff, and retryable errors.
+- Tool calls use a retry policy. The CLI can configure attempts, backoff, and retryable errors.
 - Real model smoke tests require `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL`, or an available legacy `z-ai` CLI fallback.
 
 ## 8. Output Fields
