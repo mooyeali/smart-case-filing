@@ -1,0 +1,72 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from smart_case_filing.agent.run_manager import AgentRunManager, make_file_id
+
+
+class AgentRunManagerTest(unittest.TestCase):
+    def test_creates_run_directory_and_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = AgentRunManager(Path(tmp), run_id="run-1")
+            manager.ensure()
+
+            self.assertTrue((Path(tmp) / "run-1" / "manifest.json").exists())
+            self.assertTrue((Path(tmp) / "run-1" / "traces").is_dir())
+            self.assertTrue((Path(tmp) / "run-1" / "reviews").is_dir())
+            self.assertTrue((Path(tmp) / "run-1" / "outputs").is_dir())
+            manifest = json.loads(manager.manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual("run-1", manifest["run_id"])
+            self.assertEqual([], manifest["files"])
+
+    def test_allocates_stable_per_file_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = AgentRunManager(Path(tmp), run_id="run-1")
+            paths = manager.paths_for("cases/sample.txt")
+
+            self.assertEqual(make_file_id("cases/sample.txt"), paths["file_id"])
+            self.assertEqual(Path(tmp) / "run-1" / "traces" / f"{paths['file_id']}.trace.jsonl", paths["trace"])
+            self.assertEqual(Path(tmp) / "run-1" / "reviews" / f"{paths['file_id']}.review.json", paths["review"])
+            self.assertEqual(Path(tmp) / "run-1" / "outputs" / f"{paths['file_id']}.json", paths["output"])
+
+    def test_records_file_and_updates_status_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = AgentRunManager(Path(tmp), run_id="run-1")
+            manager.record_file("a.txt", {
+                "agent_state": "COMPLETED",
+                "confidence": "high",
+            })
+            manager.record_file("b.txt", {
+                "agent_state": "NEEDS_REVIEW",
+                "confidence": "low",
+            })
+            manager.record_file("c.txt", {
+                "agent_state": "FAILED",
+                "error": "model unavailable",
+            })
+
+            manifest = manager.load_manifest()
+            self.assertEqual(3, len(manifest["files"]))
+            self.assertEqual({
+                "COMPLETED": 1,
+                "NEEDS_REVIEW": 1,
+                "FAILED": 1,
+            }, manifest["status_counts"])
+            failed = [item for item in manifest["files"] if item["agent_state"] == "FAILED"][0]
+            self.assertEqual("model unavailable", failed["error"])
+
+    def test_summary_returns_manifest_location(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = AgentRunManager(Path(tmp), run_id="run-1")
+            manager.record_file("a.txt", {"agent_state": "COMPLETED"})
+
+            summary = manager.summary()
+
+            self.assertEqual("run-1", summary["run_id"])
+            self.assertEqual(str(Path(tmp) / "run-1" / "manifest.json"), summary["manifest"])
+            self.assertEqual(1, summary["file_count"])
+
+
+if __name__ == "__main__":
+    unittest.main()
