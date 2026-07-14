@@ -47,6 +47,10 @@ from typing import Optional
 import pandas as pd
 
 from smart_case_filing.model_client import LegacyFunctionModelClient
+from smart_case_filing.agent.legacy_tools import build_legacy_tool_registry
+from smart_case_filing.agent.review import ReviewPackageWriter
+from smart_case_filing.agent.runner import AgentRunner
+from smart_case_filing.agent.state import AgentState, AgentTraceStore
 
 try:
     import requests
@@ -1073,13 +1077,61 @@ def _print_result(result: PredictionResult, as_json: bool = False):
 
 def _run_agent_cli(args):
     trace_path = Path(args.trace) if args.trace else PROGRAM_DIR / "agent_trace.jsonl"
-    print(json.dumps({
-        "state": "FAILED",
-        "reason": "agent runner is not wired yet",
+    catalog_path = Path(args.catalog)
+    file_path = Path(args.file) if args.file else None
+
+    if not file_path or not file_path.exists():
+        result = {
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": f"file does not exist: {file_path}" if file_path else "file is required",
+            "trace": str(trace_path),
+            "review_output": args.review_output or "",
+            "resume": args.resume or "",
+        }
+        if args.review_output:
+            ReviewPackageWriter(Path(args.review_output)).write(result)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    if not catalog_path.exists():
+        result = {
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": f"catalog does not exist: {catalog_path}",
+            "trace": str(trace_path),
+            "review_output": args.review_output or "",
+            "resume": args.resume or "",
+        }
+        if args.review_output:
+            ReviewPackageWriter(Path(args.review_output)).write(result)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    catalog = CatalogLoader(catalog_path).load()
+    trace_store = AgentTraceStore(trace_path)
+    registry = build_legacy_tool_registry(catalog)
+    runner = AgentRunner(registry, trace_store)
+    run_id = f"agent-{int(time.time() * 1000)}"
+    result = runner.run(run_id=run_id, file_path=str(file_path))
+
+    state = result.get("state", AgentState.FAILED)
+    state_value = state.value if isinstance(state, AgentState) else str(state)
+    output = dict(result.get("prediction") or {})
+    output.update({
+        "agent_state": state_value,
+        "state": state_value,
         "trace": str(trace_path),
         "review_output": args.review_output or "",
         "resume": args.resume or "",
-    }, ensure_ascii=False, indent=2))
+    })
+    if result.get("error"):
+        output["error"] = result["error"]
+
+    if state_value in {AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value} and args.review_output:
+        ReviewPackageWriter(Path(args.review_output)).write(output)
+
+    print(json.dumps(output, ensure_ascii=False, indent=2))
 
 
 def main():
