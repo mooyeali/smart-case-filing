@@ -46,6 +46,8 @@ from typing import Optional
 
 import pandas as pd
 
+from smart_case_filing.model_client import LegacyFunctionModelClient
+
 try:
     import requests
 except ImportError:
@@ -54,10 +56,10 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # 全局配置
 # ---------------------------------------------------------------------------
-PROJECT_ROOT = Path("/Users/mooye/python project/smart-case-filing")
 PROGRAM_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(os.getenv("SMART_CASE_FILING_ROOT", str(PROGRAM_DIR))).expanduser()
 DEFAULT_CATALOG = PROJECT_ROOT / "catalog-mapping.xlsx"
-TMP_DIR = PROJECT_ROOT / "scripts" / "_tmp_predict"
+TMP_DIR = Path(os.getenv("SMART_CASE_FILING_TMP_DIR", str(PROJECT_ROOT / "_tmp_predict"))).expanduser()
 TMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # VLM 分析时最多渲染的 PDF 页数（控制成本）
@@ -296,6 +298,17 @@ def _run_zai_vision_cli(prompt: str, image_paths: list, thinking: bool = False,
             out_file.unlink(missing_ok=True)
         except Exception:
             pass
+
+
+def _default_model_client():
+    return LegacyFunctionModelClient(
+        lambda prompt, system=None, thinking=False, timeout=CLI_TIMEOUT: _run_zai_chat(
+            prompt, system=system, thinking=thinking, timeout=timeout
+        ),
+        lambda prompt, image_paths, thinking=False, timeout=CLI_TIMEOUT: _run_zai_vision(
+            prompt, image_paths, thinking=thinking, timeout=timeout
+        ),
+    )
 
 
 def _image_to_base64(path: Path) -> str:
@@ -650,6 +663,9 @@ class VLMAnalyzer:
         "手写体、打印体等视觉特征，并能准确 OCR 出图片中的中文文字。"
     )
 
+    def __init__(self, model_client=None):
+        self.model_client = model_client or _default_model_client()
+
     def analyze(self, fc: FileContent) -> dict:
         """返回 {visual_description, ocr_text, doc_type_guess, volume_guess, case_clues}。"""
         if not fc.has_visual():
@@ -657,7 +673,7 @@ class VLMAnalyzer:
         # 限制图片数量，避免 token 爆炸
         imgs = fc.image_paths[:MAX_PDF_PAGES_FOR_VLM]
         prompt = self._build_prompt(fc)
-        raw = _run_zai_vision(prompt, imgs, thinking=False, timeout=CLI_TIMEOUT)
+        raw = self.model_client.vision(prompt, imgs, thinking=False, timeout=CLI_TIMEOUT)
         return self._parse(raw)
 
     def _build_prompt(self, fc: FileContent) -> str:
@@ -703,6 +719,9 @@ class LLMAnalyzer:
         "你能根据文书内容准确判断其所属的案件类型、卷宗（正卷/副卷）、二级目录与材料类别。"
     )
 
+    def __init__(self, model_client=None):
+        self.model_client = model_client or _default_model_client()
+
     def analyze_text(self, fc: FileContent) -> dict:
         """分析提取出的文本，返回文档语义画像。"""
         if not fc.text or not fc.text.strip():
@@ -724,7 +743,7 @@ class LLMAnalyzer:
             f"文本内容:\n{text}\n"
             "注意：只输出 JSON，不要有任何解释性文字。"
         )
-        raw = _run_zai_chat(prompt, system=self.SYSTEM, thinking=False, timeout=CLI_TIMEOUT)
+        raw = self.model_client.chat(prompt, system=self.SYSTEM, thinking=False, timeout=CLI_TIMEOUT)
         return self._parse(raw)
 
     def _parse(self, raw: str) -> dict:
@@ -777,10 +796,11 @@ class PredictionResult:
 class DirectoryPredictor:
     """融合 VLM 与 LLM 分析结果，匹配编目规则，输出推测目录。"""
 
-    def __init__(self, catalog: CatalogIndex):
+    def __init__(self, catalog: CatalogIndex, model_client=None):
         self.catalog = catalog
-        self.vlm = VLMAnalyzer()
-        self.llm = LLMAnalyzer()
+        self.model_client = model_client or _default_model_client()
+        self.vlm = VLMAnalyzer(self.model_client)
+        self.llm = LLMAnalyzer(self.model_client)
 
     def predict(self, file_path: Path) -> PredictionResult:
         file_path = Path(file_path)
@@ -908,7 +928,7 @@ class DirectoryPredictor:
             "3. 若所有候选都不匹配，confidence 设为 low 并在 reasoning 中说明。\n"
             "注意：只输出 JSON。"
         )
-        raw = _run_zai_chat(prompt, system=LLMAnalyzer.SYSTEM, thinking=True, timeout=CLI_TIMEOUT)
+        raw = self.model_client.chat(prompt, system=LLMAnalyzer.SYSTEM, thinking=True, timeout=CLI_TIMEOUT)
         return self._parse_match(raw, candidates)
 
     def _extract_keywords(self, fusion: dict) -> list:
