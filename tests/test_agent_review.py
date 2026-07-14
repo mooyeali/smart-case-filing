@@ -3,7 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from smart_case_filing.agent.review import ReviewPackageWriter, build_review_index_payload, build_review_payload
+from smart_case_filing.agent.review import (
+    ReviewPackageWriter,
+    build_review_decision_payload,
+    build_review_index_payload,
+    build_review_payload,
+)
 
 
 class ReviewPackageWriterTest(unittest.TestCase):
@@ -107,6 +112,21 @@ class ReviewPackageWriterTest(unittest.TestCase):
         self.assertEqual("run-1", payload["run_id"])
         self.assertEqual(2, payload["review_count"])
         self.assertEqual(["review", "failed"], [item["file_id"] for item in payload["items"]])
+
+    def test_builds_review_decision_payload(self):
+        payload = build_review_decision_payload({
+            "file_id": "file-1",
+            "file_path": "case.pdf",
+            "decision": "corrected",
+            "final_prediction": {"predicted_material_category": "complaint"},
+            "reviewer": "reviewer-a",
+            "notes": "Authorization: Bearer sk-abcdef1234567890",
+        })
+
+        self.assertEqual("file-1", payload["file_id"])
+        self.assertEqual("corrected", payload["decision"])
+        self.assertEqual("complaint", payload["final_prediction"]["predicted_material_category"])
+        self.assertIn("created_at", payload)
 
 
 if __name__ == "__main__":

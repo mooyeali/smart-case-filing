@@ -56,6 +56,19 @@ def build_review_index_payload(manifest: dict) -> dict:
     }
 
 
+def build_review_decision_payload(decision: dict) -> dict:
+    final_prediction = decision.get("final_prediction") or {}
+    return {
+        "file_id": decision.get("file_id", ""),
+        "file_path": decision.get("file_path", ""),
+        "decision": decision.get("decision", ""),
+        "final_prediction": final_prediction,
+        "reviewer": decision.get("reviewer", ""),
+        "notes": decision.get("notes", ""),
+        "created_at": time.time(),
+    }
+
+
 class ReviewPackageWriter:
     def __init__(self, path: Path):
         self.path = Path(path)

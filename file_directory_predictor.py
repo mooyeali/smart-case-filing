@@ -1079,6 +1079,10 @@ def _print_result(result: PredictionResult, as_json: bool = False):
 
 
 def _run_agent_cli(args):
+    if getattr(args, "review_decision", ""):
+        _run_review_decision_cli(args)
+        return
+
     if getattr(args, "agent_preflight", False):
         print(json.dumps(check_model_preflight(), ensure_ascii=False, indent=2))
         return
@@ -1162,6 +1166,42 @@ def _agent_retry_policy_from_args(args) -> RetryPolicy:
         backoff_factor=max(1.0, float(getattr(args, "agent_retry_backoff", 2.0) or 2.0)),
         retryable_errors=retryable_errors or RetryPolicy().retryable_errors,
     )
+
+
+def _run_review_decision_cli(args):
+    decision_path = Path(args.review_decision)
+    if not decision_path.exists():
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": f"review decision does not exist: {decision_path}",
+        }, ensure_ascii=False, indent=2))
+        return
+    if not args.resume:
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": "--resume <manifest-or-run-dir> is required with --review-decision",
+        }, ensure_ascii=False, indent=2))
+        return
+    resume_path = Path(args.resume)
+    manifest_path = resume_path / "manifest.json" if resume_path.is_dir() else resume_path
+    if not manifest_path.exists():
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": f"manifest does not exist: {manifest_path}",
+        }, ensure_ascii=False, indent=2))
+        return
+
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    manager = AgentRunManager(manifest_path.parent, run_id=manifest_path.parent.name)
+    result = manager.record_decision(decision)
+    result.update({
+        "agent_state": "REVIEW_DECISION_RECORDED",
+        "state": "REVIEW_DECISION_RECORDED",
+    })
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 def _agent_batch_root(args) -> Path:
@@ -1403,9 +1443,10 @@ def main():
     parser.add_argument("--agent-retry-backoff", type=float, default=2.0, help="智能体重试退避倍率")
     parser.add_argument("--agent-retry-errors", default="", help="逗号分隔的可重试错误关键字")
     parser.add_argument("--agent-preflight", action="store_true", help="检查智能体模型配置，不调用网络 API")
+    parser.add_argument("--review-decision", help="写入人工复核决定 JSON，并更新 run manifest")
     args = parser.parse_args()
 
-    if not args.file and not args.batch and not (args.agent and (args.resume or args.agent_preflight)):
+    if not args.file and not args.batch and not (args.agent and (args.resume or args.agent_preflight or args.review_decision)):
         parser.error("请提供文件路径或 --batch 目录")
 
     output_path = Path(args.output) if args.output else PROGRAM_DIR / DEFAULT_OUTPUT_FILE

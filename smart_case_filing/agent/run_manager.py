@@ -7,7 +7,11 @@ import uuid
 from pathlib import Path
 
 from smart_case_filing.agent.state import AgentState
-from smart_case_filing.agent.review import ReviewPackageWriter, build_review_index_payload
+from smart_case_filing.agent.review import (
+    ReviewPackageWriter,
+    build_review_decision_payload,
+    build_review_index_payload,
+)
 
 
 TERMINAL_STATES = {
@@ -40,12 +44,14 @@ class AgentRunManager:
         self.run_dir = self.root / self.run_id if self.root.name != self.run_id else self.root
         self.traces_dir = self.run_dir / "traces"
         self.reviews_dir = Path(reviews_dir) if reviews_dir else self.run_dir / "reviews"
+        self.decisions_dir = self.run_dir / "decisions"
         self.outputs_dir = self.run_dir / "outputs"
         self.manifest_path = self.run_dir / "manifest.json"
 
     def ensure(self) -> None:
         self.traces_dir.mkdir(parents=True, exist_ok=True)
         self.reviews_dir.mkdir(parents=True, exist_ok=True)
+        self.decisions_dir.mkdir(parents=True, exist_ok=True)
         self.outputs_dir.mkdir(parents=True, exist_ok=True)
         if not self.manifest_path.exists():
             now = time.time()
@@ -123,6 +129,49 @@ class AgentRunManager:
         index_path = self.reviews_dir / "index.json"
         ReviewPackageWriter(index_path).write(build_review_index_payload(manifest))
         return index_path
+
+    def record_decision(self, decision: dict) -> dict:
+        self.ensure()
+        payload = build_review_decision_payload(decision)
+        file_id = payload.get("file_id") or make_file_id(payload.get("file_path", "reviewed"))
+        payload["file_id"] = file_id
+        decision_path = self.decisions_dir / f"{file_id}.decision.json"
+        ReviewPackageWriter(decision_path).write(payload)
+
+        manifest = self.load_manifest()
+        files = manifest.get("files", [])
+        matched = False
+        for item in files:
+            if item.get("file_id") == file_id or (
+                payload.get("file_path") and item.get("file_path") == payload.get("file_path")
+            ):
+                item["decision"] = payload.get("decision", "")
+                item["decision_path"] = str(decision_path)
+                item["reviewed_at"] = payload.get("created_at")
+                matched = True
+        if not matched:
+            files.append({
+                "file_id": file_id,
+                "file_path": payload.get("file_path", ""),
+                "agent_state": "",
+                "confidence": "",
+                "trace": "",
+                "review": "",
+                "output": "",
+                "error": "",
+                "decision": payload.get("decision", ""),
+                "decision_path": str(decision_path),
+                "reviewed_at": payload.get("created_at"),
+            })
+        manifest["files"] = files
+        manifest["updated_at"] = time.time()
+        self.write_manifest(manifest)
+        return {
+            "decision": payload.get("decision", ""),
+            "decision_path": str(decision_path),
+            "file_id": file_id,
+            "manifest": str(self.manifest_path),
+        }
 
     @staticmethod
     def _status_counts(files: list[dict]) -> dict:

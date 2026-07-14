@@ -149,6 +149,32 @@ class AgentFullChainTest(unittest.TestCase):
             self.assertEqual(0, resume["resumed_count"])
             self.assertEqual(3, resume["skipped_count"])
 
+            review_item = [item for item in manifest["files"] if item["agent_state"] == "NEEDS_REVIEW"][0]
+            decision_file = tmp_path / "decision.json"
+            decision_file.write_text(json.dumps({
+                "file_id": review_item["file_id"],
+                "file_path": review_item["file_path"],
+                "decision": "approved",
+                "reviewer": "reviewer-a",
+                "notes": "looks correct",
+            }), encoding="utf-8")
+            decision_output = tmp_path / "decision-output.json"
+            self.run_main([
+                "file_directory_predictor.py",
+                "--agent",
+                "--resume", summary["manifest"],
+                "--review-decision", str(decision_file),
+                "--output", str(decision_output),
+                "--log", str(tmp_path / "decision.log"),
+            ])
+
+            decision = json.loads(decision_output.read_text(encoding="utf-8"))
+            self.assertEqual("REVIEW_DECISION_RECORDED", decision["agent_state"])
+            updated_manifest = json.loads(Path(summary["manifest"]).read_text(encoding="utf-8"))
+            updated_item = [item for item in updated_manifest["files"] if item.get("file_id") == review_item["file_id"]][0]
+            self.assertEqual("approved", updated_item["decision"])
+            self.assertTrue(Path(updated_item["decision_path"]).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -102,6 +102,33 @@ class AgentRunManagerTest(unittest.TestCase):
             self.assertEqual({"NEEDS_REVIEW", "FAILED"}, {item["agent_state"] for item in data["items"]})
             self.assertNotIn("sk-1234567890abcdef", raw)
 
+    def test_records_review_decision_and_updates_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = AgentRunManager(Path(tmp), run_id="run-1")
+            paths = manager.paths_for("review.txt")
+            manager.record_file("review.txt", {
+                "agent_state": "NEEDS_REVIEW",
+                "confidence": "low",
+            }, paths)
+
+            result = manager.record_decision({
+                "file_id": paths["file_id"],
+                "file_path": "review.txt",
+                "decision": "approved",
+                "reviewer": "reviewer-a",
+                "notes": "Authorization: Bearer sk-1234567890abcdef",
+            })
+
+            self.assertEqual("approved", result["decision"])
+            decision_path = Path(result["decision_path"])
+            self.assertTrue(decision_path.exists())
+            self.assertNotIn("sk-1234567890abcdef", decision_path.read_text(encoding="utf-8"))
+            manifest = manager.load_manifest()
+            item = manifest["files"][0]
+            self.assertEqual("approved", item["decision"])
+            self.assertEqual(str(decision_path), item["decision_path"])
+            self.assertIn("reviewed_at", item)
+
 
 if __name__ == "__main__":
     unittest.main()
