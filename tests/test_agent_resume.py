@@ -69,16 +69,26 @@ class AgentResumeTest(unittest.TestCase):
             self.assertEqual("FAILED", data["agent_state"])
             self.assertIn("trace does not exist", data["error"])
 
-    def test_resume_partial_trace_is_explicitly_unsupported(self):
+    def test_resume_partial_trace_without_catalog_fails_clearly(self):
         with tempfile.TemporaryDirectory() as tmp:
             trace_path = Path(tmp) / "trace.jsonl"
             append_step(trace_path, AgentState.TEXT_ANALYZED)
 
-            data = self.run_resume(trace_path)
+            output_file = trace_path.parent / "resume-output.json"
+            log_file = trace_path.parent / "resume.log"
+            with patch.object(sys, "argv", [
+                "file_directory_predictor.py",
+                "--agent",
+                "--resume", str(trace_path),
+                "--catalog", str(Path(tmp) / "missing.xlsx"),
+                "--output", str(output_file),
+                "--log", str(log_file),
+            ]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                fdp.main()
+            data = json.loads(output_file.read_text(encoding="utf-8"))
 
             self.assertEqual("FAILED", data["agent_state"])
-            self.assertEqual("TEXT_ANALYZED", data["last_state"])
-            self.assertEqual("partial resume is not supported in phase two", data["reason"])
+            self.assertIn("catalog does not exist", data["error"])
 
     def test_resume_needs_review_trace_returns_summary(self):
         with tempfile.TemporaryDirectory() as tmp:

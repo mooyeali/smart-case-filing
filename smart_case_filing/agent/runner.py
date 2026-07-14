@@ -49,51 +49,111 @@ class AgentRunner:
         return result
 
     def run(self, run_id: str, file_path: str) -> dict:
-        start = ToolResult(ok=True, data={"file_path": file_path})
-        self._record(run_id, file_path, AgentState.STARTED, "start", {}, start)
+        return self._run_flow(run_id, file_path, start_after=None, context={"file_path": file_path})
+
+    def resume(self, run_id: str, file_path: str, steps: list[AgentStep]) -> dict:
+        if not steps:
+            return self.run(run_id, file_path)
+
+        last = steps[-1]
+        if last.state in {AgentState.COMPLETED, AgentState.NEEDS_REVIEW}:
+            return {"state": last.state, "prediction": dict(last.output_summary or {})}
+        if last.state == AgentState.FAILED:
+            return {"state": AgentState.FAILED, "error": last.error or "agent run failed"}
 
         context = {"file_path": file_path}
-        extracted = self._run_tool(
-            run_id, file_path, AgentState.EXTRACTED, "extract_content", context
-        )
-        if not extracted.ok:
-            return {"state": AgentState.FAILED, "error": extracted.error}
-        context.update(extracted.data)
+        for step in steps:
+            context.update(step.output_summary or {})
+        return self._run_flow(run_id, file_path, start_after=last.state, context=context)
 
-        if context.get("image_count", 0) or getattr(context.get("_fc"), "has_visual", lambda: False)():
-            visual = self._run_tool(run_id, file_path, AgentState.VISUAL_ANALYZED, "analyze_visual", context)
+    def _run_flow(self, run_id: str, file_path: str, start_after: AgentState | None, context: dict) -> dict:
+        if start_after is None:
+            start = ToolResult(ok=True, data={"file_path": file_path})
+            self._record(run_id, file_path, AgentState.STARTED, "start", {}, start)
+
+        if start_after is None or start_after == AgentState.STARTED:
+            extracted = self._run_tool(
+                run_id, file_path, AgentState.EXTRACTED, "extract_content", context
+            )
+            if not extracted.ok:
+                return {"state": AgentState.FAILED, "error": extracted.error}
+            context.update(extracted.data)
+        elif start_after in {
+            AgentState.EXTRACTED,
+            AgentState.VISUAL_ANALYZED,
+            AgentState.TEXT_ANALYZED,
+            AgentState.CANDIDATES_RETRIEVED,
+            AgentState.MATCHED,
+        }:
+            pass
         else:
-            visual = ToolResult(ok=True, data={
-                "vlm_analysis": {"available": False, "skipped": True, "reason": "no visual input"}
-            })
-            self._record(run_id, file_path, AgentState.VISUAL_ANALYZED, "analyze_visual", context, visual)
-        if not visual.ok:
-            return {"state": AgentState.FAILED, "error": visual.error}
-        context.update(visual.data)
+            return {"state": AgentState.FAILED, "error": f"cannot resume from state: {start_after.value}"}
 
-        if context.get("text_length", 0):
-            text = self._run_tool(run_id, file_path, AgentState.TEXT_ANALYZED, "analyze_text", context)
+        if start_after not in {AgentState.VISUAL_ANALYZED, AgentState.TEXT_ANALYZED,
+                               AgentState.CANDIDATES_RETRIEVED, AgentState.MATCHED}:
+            if start_after == AgentState.EXTRACTED and not context.get("_fc"):
+                return {
+                    "state": AgentState.FAILED,
+                    "error": "cannot resume after EXTRACTED: extracted file content is not available in trace",
+                }
+            if context.get("image_count", 0) or getattr(context.get("_fc"), "has_visual", lambda: False)():
+                visual = self._run_tool(run_id, file_path, AgentState.VISUAL_ANALYZED, "analyze_visual", context)
+            else:
+                visual = ToolResult(ok=True, data={
+                    "vlm_analysis": {"available": False, "skipped": True, "reason": "no visual input"}
+                })
+                self._record(run_id, file_path, AgentState.VISUAL_ANALYZED, "analyze_visual", context, visual)
+            if not visual.ok:
+                return {"state": AgentState.FAILED, "error": visual.error}
+            context.update(visual.data)
+
+        if start_after in {AgentState.TEXT_ANALYZED, AgentState.CANDIDATES_RETRIEVED, AgentState.MATCHED}:
+            pass
         else:
-            text = ToolResult(ok=True, data={
-                "llm_analysis": {"available": False, "skipped": True, "reason": "no text input"}
-            })
-            self._record(run_id, file_path, AgentState.TEXT_ANALYZED, "analyze_text", context, text)
-        if not text.ok:
-            return {"state": AgentState.FAILED, "error": text.error}
-        context.update(text.data)
+            if start_after == AgentState.VISUAL_ANALYZED and context.get("text_length", 0) and not context.get("_fc"):
+                return {
+                    "state": AgentState.FAILED,
+                    "error": "cannot resume after VISUAL_ANALYZED: extracted file content is not available in trace",
+                }
+            if context.get("text_length", 0):
+                text = self._run_tool(run_id, file_path, AgentState.TEXT_ANALYZED, "analyze_text", context)
+            else:
+                text = ToolResult(ok=True, data={
+                    "llm_analysis": {"available": False, "skipped": True, "reason": "no text input"}
+                })
+                self._record(run_id, file_path, AgentState.TEXT_ANALYZED, "analyze_text", context, text)
+            if not text.ok:
+                return {"state": AgentState.FAILED, "error": text.error}
+            context.update(text.data)
 
-        candidates = self._run_tool(
-            run_id, file_path, AgentState.CANDIDATES_RETRIEVED, "retrieve_candidates", context
-        )
-        if not candidates.ok:
-            return {"state": AgentState.FAILED, "error": candidates.error}
-        context.update(candidates.data)
+        if start_after in {AgentState.CANDIDATES_RETRIEVED, AgentState.MATCHED}:
+            pass
+        else:
+            candidates = self._run_tool(
+                run_id, file_path, AgentState.CANDIDATES_RETRIEVED, "retrieve_candidates", context
+            )
+            if not candidates.ok:
+                return {"state": AgentState.FAILED, "error": candidates.error}
+            context.update(candidates.data)
 
-        match = self._run_tool(run_id, file_path, AgentState.MATCHED, "select_catalog", context)
-        if not match.ok:
-            return {"state": AgentState.FAILED, "error": match.error}
-        context.update(match.data)
+        if start_after == AgentState.MATCHED:
+            pass
+        else:
+            if start_after == AgentState.CANDIDATES_RETRIEVED and not context.get("_candidates"):
+                return {
+                    "state": AgentState.FAILED,
+                    "error": "cannot resume after CANDIDATES_RETRIEVED: candidate objects are not available in trace",
+                }
+            match = self._run_tool(run_id, file_path, AgentState.MATCHED, "select_catalog", context)
+            if not match.ok:
+                return {"state": AgentState.FAILED, "error": match.error}
+            context.update(match.data)
 
+        if start_after == AgentState.MATCHED and not context.get("match"):
+            return {
+                "state": AgentState.FAILED,
+                "error": "cannot resume after MATCHED: match payload is not available in trace",
+            }
         final = self._run_tool(run_id, file_path, AgentState.COMPLETED, "finalize_prediction", context)
         if not final.ok:
             return {"state": AgentState.FAILED, "error": final.error}

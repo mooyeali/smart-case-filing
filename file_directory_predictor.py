@@ -1209,6 +1209,10 @@ def _run_agent_batch_cli(args):
 
 def _run_agent_resume(args):
     trace_path = Path(args.resume)
+    if trace_path.is_dir() or trace_path.name == "manifest.json":
+        _run_agent_batch_resume(args, trace_path)
+        return
+
     if not trace_path.exists():
         print(json.dumps({
             "agent_state": AgentState.FAILED.value,
@@ -1256,15 +1260,80 @@ def _run_agent_resume(args):
         }, ensure_ascii=False, indent=2))
         return
 
-    print(json.dumps({
-        "agent_state": AgentState.FAILED.value,
-        "state": AgentState.FAILED.value,
-        "trace": str(trace_path),
+    result = _resume_agent_trace(args, trace_path, steps)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def _resume_agent_trace(args, trace_path: Path, steps: list) -> dict:
+    last = steps[-1]
+    catalog_path = Path(args.catalog)
+    if not catalog_path.exists():
+        return {
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "trace": str(trace_path),
+            "resume": True,
+            "file_path": last.file_path,
+            "run_id": last.run_id,
+            "error": f"catalog does not exist: {catalog_path}",
+        }
+
+    catalog = CatalogLoader(catalog_path).load()
+    registry = build_legacy_tool_registry(catalog)
+    runner = AgentRunner(registry, AgentTraceStore(trace_path))
+    result = runner.resume(run_id=last.run_id, file_path=last.file_path, steps=steps)
+    output = _agent_output_from_result(result, trace_path, args.review_output or "", args.resume or "")
+    output.update({
         "resume": True,
-        "file_path": last.file_path,
+        "file_path": output.get("file_path") or last.file_path,
         "run_id": last.run_id,
-        "reason": "partial resume is not supported in phase two",
         "last_state": last.state.value,
+    })
+    if output["agent_state"] in {AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value} and args.review_output:
+        ReviewPackageWriter(Path(args.review_output)).write(build_review_payload(output, str(trace_path)))
+    return output
+
+
+def _run_agent_batch_resume(args, resume_path: Path):
+    manifest_path = resume_path / "manifest.json" if resume_path.is_dir() else resume_path
+    if not manifest_path.exists():
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "resume": True,
+            "error": f"manifest does not exist: {manifest_path}",
+        }, ensure_ascii=False, indent=2))
+        return
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files = manifest.get("files", [])
+    resumed = []
+    skipped = []
+    for item in files:
+        state = item.get("agent_state", "")
+        if state in {AgentState.COMPLETED.value, AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value}:
+            skipped.append(item)
+            continue
+        trace_path = Path(item.get("trace", ""))
+        steps = AgentTraceStore(trace_path).load()
+        if not steps:
+            resumed.append({
+                "file_path": item.get("file_path", ""),
+                "agent_state": AgentState.FAILED.value,
+                "error": "trace is empty or missing",
+            })
+            continue
+        resumed.append(_resume_agent_trace(args, trace_path, steps))
+
+    print(json.dumps({
+        "agent_state": "BATCH_RESUMED",
+        "state": "BATCH_RESUMED",
+        "resume": True,
+        "manifest": str(manifest_path),
+        "resumed_count": len(resumed),
+        "skipped_count": len(skipped),
+        "resumed": resumed,
+        "skipped": skipped,
     }, ensure_ascii=False, indent=2))
 
 
