@@ -215,6 +215,11 @@ class AgentPartialResumeTest(unittest.TestCase):
             self.assertEqual(1, data["resumed_count"])
             self.assertEqual(1, data["skipped_count"])
             self.assertEqual("COMPLETED", data["resumed"][0]["agent_state"])
+            updated_manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            partial = [item for item in updated_manifest["files"] if item["file_path"] == "partial.txt"][0]
+            self.assertEqual("COMPLETED", partial["agent_state"])
+            self.assertTrue(Path(partial["output"]).exists())
+            self.assertTrue(Path(data["review_index"]).exists())
 
 
 if __name__ == "__main__":

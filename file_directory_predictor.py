@@ -1312,6 +1312,14 @@ def _run_agent_batch_resume(args, resume_path: Path):
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     files = manifest.get("files", [])
+    run_dir = manifest_path.parent
+    review_dir = None
+    for item in files:
+        if item.get("review"):
+            review_dir = Path(item["review"]).parent
+            break
+    manager = AgentRunManager(run_dir, run_id=run_dir.name, reviews_dir=review_dir)
+    manager.ensure()
     resumed = []
     skipped = []
     for item in files:
@@ -1328,13 +1336,27 @@ def _run_agent_batch_resume(args, resume_path: Path):
                 "error": "trace is empty or missing",
             })
             continue
-        resumed.append(_resume_agent_trace(args, trace_path, steps))
+        output = _resume_agent_trace(args, trace_path, steps)
+        paths = {
+            "file_id": item.get("file_id") or Path(item.get("output", trace_path.stem)).stem,
+            "trace": trace_path,
+            "review": Path(item.get("review") or manager.paths_for(item.get("file_path", ""))["review"]),
+            "output": Path(item.get("output") or manager.paths_for(item.get("file_path", ""))["output"]),
+        }
+        paths["output"].parent.mkdir(parents=True, exist_ok=True)
+        paths["output"].write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if output["agent_state"] in {AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value}:
+            ReviewPackageWriter(paths["review"]).write(build_review_payload(output, str(trace_path)))
+        manager.record_file(item.get("file_path", output.get("file_path", "")), output, paths)
+        resumed.append(output)
 
+    review_index = manager.write_review_index()
     print(json.dumps({
         "agent_state": "BATCH_RESUMED",
         "state": "BATCH_RESUMED",
         "resume": True,
         "manifest": str(manifest_path),
+        "review_index": str(review_index),
         "resumed_count": len(resumed),
         "skipped_count": len(skipped),
         "resumed": resumed,

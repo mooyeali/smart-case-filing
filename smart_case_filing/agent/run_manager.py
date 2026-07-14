@@ -96,7 +96,10 @@ class AgentRunManager:
         }
 
         manifest = self.load_manifest()
-        files = [item for item in manifest.get("files", []) if item.get("file_id") != paths["file_id"]]
+        files = [
+            item for item in manifest.get("files", [])
+            if item.get("file_id") != paths["file_id"] and item.get("file_path") != str(file_path)
+        ]
         files.append(entry)
         manifest["files"] = files
         manifest["updated_at"] = time.time()
