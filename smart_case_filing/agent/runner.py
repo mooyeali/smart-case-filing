@@ -4,6 +4,7 @@ from copy import deepcopy
 
 from smart_case_filing.agent.state import AgentState, AgentStep, AgentTraceStore
 from smart_case_filing.agent.tools import AgentToolRegistry, ToolResult
+from smart_case_filing.agent.retry import NO_RETRY, RetryPolicy
 from smart_case_filing.model_client import redact_secret
 
 
@@ -26,9 +27,11 @@ def _safe_summary(value):
 
 
 class AgentRunner:
-    def __init__(self, tools: AgentToolRegistry, trace_store: AgentTraceStore):
+    def __init__(self, tools: AgentToolRegistry, trace_store: AgentTraceStore,
+                 retry_policy: RetryPolicy | None = None):
         self.tools = tools
         self.trace_store = trace_store
+        self.retry_policy = retry_policy or NO_RETRY
 
     def _record(self, run_id: str, file_path: str, state: AgentState, tool: str,
                 input_summary: dict, result: ToolResult) -> None:
@@ -38,13 +41,13 @@ class AgentRunner:
             state=state,
             tool=tool,
             input_summary=_safe_summary(input_summary),
-            output_summary=_safe_summary(result.data if result.ok else {}),
+            output_summary=_safe_summary(result.data or {}),
             error=redact_secret(result.error),
         ))
 
     def _run_tool(self, run_id: str, file_path: str, state: AgentState,
                   tool: str, payload: dict) -> ToolResult:
-        result = self.tools.run(tool, payload)
+        result = self.retry_policy.run(lambda: self.tools.run(tool, payload))
         self._record(run_id, file_path, state, tool, payload, result)
         return result
 
