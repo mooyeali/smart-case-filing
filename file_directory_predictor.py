@@ -1071,6 +1071,17 @@ def _print_result(result: PredictionResult, as_json: bool = False):
     print("=" * 72)
 
 
+def _run_agent_cli(args):
+    trace_path = Path(args.trace) if args.trace else PROGRAM_DIR / "agent_trace.jsonl"
+    print(json.dumps({
+        "state": "FAILED",
+        "reason": "agent runner is not wired yet",
+        "trace": str(trace_path),
+        "review_output": args.review_output or "",
+        "resume": args.resume or "",
+    }, ensure_ascii=False, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="基于 VLM+LLM 的文件目录推测系统",
@@ -1084,6 +1095,10 @@ def main():
     parser.add_argument("--json", action="store_true", help="以 JSON 输出结果")
     parser.add_argument("--output", help="运行结果保存路径（默认程序目录下 file_directory_predictor_output.txt）")
     parser.add_argument("--log", help="运行日志保存路径（默认程序目录下 file_directory_predictor.log）")
+    parser.add_argument("--agent", action="store_true", help="启用智能体状态机执行")
+    parser.add_argument("--trace", help="智能体执行轨迹 JSONL 保存路径")
+    parser.add_argument("--review-output", help="需要人工复核时输出复核材料的路径")
+    parser.add_argument("--resume", help="从已有 trace JSONL 恢复智能体任务")
     args = parser.parse_args()
 
     if not args.file and not args.batch:
@@ -1093,6 +1108,10 @@ def main():
     log_path = Path(args.log) if args.log else PROGRAM_DIR / DEFAULT_LOG_FILE
 
     with _save_cli_streams(output_path, log_path):
+        if args.agent:
+            _run_agent_cli(args)
+            return
+
         catalog_path = Path(args.catalog)
         if not catalog_path.exists():
             print(f"[错误] 编目规则文件不存在: {catalog_path}", file=sys.stderr)
