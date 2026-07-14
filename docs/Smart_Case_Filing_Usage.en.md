@@ -1,0 +1,403 @@
+# file_directory_predictor.py English Usage Guide
+
+[中文使用说明](卷宗智能推理编目使用说明.md)
+
+This document explains how to install, configure, and run `file_directory_predictor.py`, and how to understand its output and troubleshoot common issues.
+
+`file_directory_predictor.py` is a court case filing directory prediction tool. It reads an input file, calls text and vision models to build a document profile, and uses `catalog-mapping.xlsx` catalog rules to predict the destination directory.
+
+Final directory format:
+
+```text
+case type / volume / second-level directory / material category
+```
+
+## 1. Environment Requirements
+
+### 1.1 Python
+
+Python 3.10 or later is recommended.
+
+```bash
+python --version
+```
+
+### 1.2 Python Dependencies
+
+Install dependencies:
+
+```bash
+pip install pandas openpyxl pymupdf python-docx requests
+```
+
+| Dependency | Purpose |
+| --- | --- |
+| `pandas` | Reads Excel catalog rules and spreadsheet files |
+| `openpyxl` | Enables `.xlsx` support |
+| `pymupdf` | Extracts PDF text and renders pages |
+| `python-docx` | Extracts `.docx` content |
+| `requests` | Calls OpenAI-compatible HTTP model services |
+
+### 1.3 LibreOffice Optional
+
+LibreOffice is required only for legacy `.doc` files.
+
+```bash
+libreoffice --version
+```
+
+## 2. Model Service Configuration
+
+The script prefers OpenAI-compatible HTTP APIs. At minimum, configure:
+
+- `base_url`
+- `api_key`
+- `model`
+
+### 2.1 Generic Configuration
+
+Bash:
+
+```bash
+export AI_BASE_URL="https://api.openai.com/v1"
+export AI_API_KEY="sk-..."
+export AI_MODEL="gpt-4.1"
+```
+
+PowerShell:
+
+```powershell
+$env:AI_BASE_URL = "https://api.openai.com/v1"
+$env:AI_API_KEY = "sk-..."
+$env:AI_MODEL = "gpt-4.1"
+```
+
+### 2.2 Separate Chat and Vision Models
+
+Bash:
+
+```bash
+export AI_CHAT_BASE_URL="https://api.deepseek.com/v1"
+export AI_CHAT_API_KEY="sk-..."
+export AI_CHAT_MODEL="deepseek-chat"
+
+export AI_VISION_BASE_URL="https://api.openai.com/v1"
+export AI_VISION_API_KEY="sk-..."
+export AI_VISION_MODEL="gpt-4.1"
+```
+
+PowerShell:
+
+```powershell
+$env:AI_CHAT_BASE_URL = "https://api.deepseek.com/v1"
+$env:AI_CHAT_API_KEY = "sk-..."
+$env:AI_CHAT_MODEL = "deepseek-chat"
+
+$env:AI_VISION_BASE_URL = "https://api.openai.com/v1"
+$env:AI_VISION_API_KEY = "sk-..."
+$env:AI_VISION_MODEL = "gpt-4.1"
+```
+
+### 2.3 Priority
+
+```text
+chat:
+  AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL
+  -> AI_BASE_URL / AI_API_KEY / AI_MODEL
+
+vision:
+  AI_VISION_BASE_URL / AI_VISION_API_KEY / AI_VISION_MODEL
+  -> AI_BASE_URL / AI_API_KEY / AI_MODEL
+```
+
+### 2.4 z-ai Fallback
+
+If the HTTP configuration is incomplete, the script falls back to:
+
+```bash
+z-ai chat
+z-ai vision
+```
+
+Check the fallback before use:
+
+```bash
+z-ai chat -p "test"
+z-ai vision -p "describe image" -i /path/to/image.png
+```
+
+## 3. Catalog Rules
+
+`catalog-mapping.xlsx` must contain at least:
+
+```text
+case_type
+volume
+second_level_directory
+constraint
+material_category
+catalog_name_example
+```
+
+Pass the catalog explicitly:
+
+```bash
+--catalog ./catalog-mapping.xlsx
+```
+
+## 4. Supported Inputs
+
+| File type | Extensions | Processing |
+| --- | --- | --- |
+| PDF | `.pdf` | Extract text and render first N pages for vision analysis |
+| Word | `.docx` | Extract paragraphs and table text |
+| Legacy Word | `.doc` | Convert with LibreOffice first |
+| Image | `.png` `.jpg` `.jpeg` `.gif` `.webp` `.bmp` | Send to vision model for recognition and OCR |
+| Spreadsheet | `.xlsx` `.xlsm` `.xls` | Read first 200 rows of all sheets |
+| Text | `.txt` `.csv` `.tsv` `.md` `.json` `.log` `.xml` `.html` `.htm` | Try multiple encodings |
+| Other | any extension | Fallback to text reading |
+
+## 5. Single-file Prediction
+
+Basic command:
+
+```bash
+python file_directory_predictor.py ./sample.pdf --catalog ./catalog-mapping.xlsx
+```
+
+JSON output:
+
+```bash
+python file_directory_predictor.py ./sample.pdf --catalog ./catalog-mapping.xlsx --json
+```
+
+The output includes:
+
+- File path
+- File type
+- Predicted directory
+- Catalog name example
+- Confidence
+- Reasoning
+- VLM analysis
+- LLM analysis
+- Matched catalog entries
+
+## 6. Batch Prediction
+
+Process direct files under a directory:
+
+```bash
+python file_directory_predictor.py --batch ./input-files --catalog ./catalog-mapping.xlsx
+```
+
+Batch JSON output:
+
+```bash
+python file_directory_predictor.py --batch ./input-files --catalog ./catalog-mapping.xlsx --json
+```
+
+Save output and logs to explicit files:
+
+```bash
+python file_directory_predictor.py ./sample.pdf --catalog ./catalog-mapping.xlsx --json --output ./result.json --log ./run.log
+```
+
+If `--output` and `--log` are not provided, the program writes default files under the script directory:
+
+- `file_directory_predictor_output.txt`: runtime output, equivalent to stdout
+- `file_directory_predictor.log`: runtime logs, equivalent to stderr
+
+The current batch mode does not recurse into subdirectories.
+
+## 7. Output Fields
+
+Example JSON shape:
+
+```json
+{
+  "file_path": "sample.pdf",
+  "file_type": "pdf",
+  "predicted_case_type": "Civil First-instance Case Catalog Rules",
+  "predicted_volume": "Main volume",
+  "predicted_second_level_directory": "Complaint and related materials",
+  "predicted_material_category": "Civil complaint",
+  "predicted_catalog_example": "Civil complaint",
+  "confidence": "high",
+  "reasoning": "Reasoning",
+  "vlm_analysis": {},
+  "llm_analysis": {},
+  "matched_entries": []
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `file_path` | Input file path |
+| `file_type` | Detected file type |
+| `predicted_case_type` | Predicted case type |
+| `predicted_volume` | Predicted volume |
+| `predicted_second_level_directory` | Predicted second-level directory |
+| `predicted_material_category` | Predicted material category |
+| `predicted_catalog_example` | Catalog name example |
+| `confidence` | `high`, `medium`, or `low` |
+| `reasoning` | Model reasoning |
+| `vlm_analysis` | Vision-model analysis |
+| `llm_analysis` | Text-model analysis |
+| `matched_entries` | Matched catalog entries |
+
+## 8. Internal Flow
+
+### 8.1 Content Extraction
+
+`ContentExtractor.extract()` returns:
+
+```text
+file_path
+file_type
+text
+image_paths
+page_count
+extract_error
+```
+
+### 8.2 Vision Analysis
+
+`VLMAnalyzer.analyze()` calls `_run_zai_vision()`.
+
+HTTP path:
+
+```text
+POST {AI_VISION_BASE_URL or AI_BASE_URL}/chat/completions
+```
+
+Vision payload uses `image_url` data URIs.
+
+### 8.3 Text Analysis
+
+`LLMAnalyzer.analyze_text()` calls `_run_zai_chat()` and expects JSON containing document type, volume, case clues, key phrases, summary, and confidence.
+
+### 8.4 Candidate Retrieval
+
+`DirectoryPredictor` passes the file parent directory name to `CatalogIndex.search_candidates()` as the case-number clue.
+
+`CatalogIndex.search_candidates()` first tries to infer the case type from the case number, such as `民初`, `民终`, `刑初`, `行再`, or `执`, and loads all catalog rules for that case type. If the case type cannot be inferred from the case number, it falls back to keyword-based candidate retrieval using document type, case clues, summary, key phrases, and file name.
+
+### 8.5 Candidate Selection
+
+The model selects one candidate index. The code trusts `selected_index` first and writes back exact fields from the selected catalog row.
+
+## 9. Tuning
+
+Common constants:
+
+```python
+MAX_PDF_PAGES_FOR_VLM = 10
+MAX_TEXT_CHARS = 6000
+CLI_TIMEOUT = 180
+```
+
+| Constant | Meaning |
+| --- | --- |
+| `MAX_PDF_PAGES_FOR_VLM` | Number of PDF pages sent to the vision model |
+| `MAX_TEXT_CHARS` | Maximum text characters sent to the LLM |
+| `CLI_TIMEOUT` | Model-call timeout in seconds |
+
+## 10. Troubleshooting
+
+### 10.1 Default path does not match the deployment environment
+
+The script currently defines these default paths near the top of `file_directory_predictor.py`:
+
+```python
+PROJECT_ROOT = Path("/Users/mooye/python project/smart-case-filing")
+PROGRAM_DIR = Path(__file__).resolve().parent
+DEFAULT_CATALOG = PROJECT_ROOT / "catalog-mapping.xlsx"
+TMP_DIR = PROJECT_ROOT / "scripts" / "_tmp_predict"
+```
+
+When deploying to another machine, pass the catalog explicitly:
+
+```bash
+--catalog ./catalog-mapping.xlsx
+```
+
+For long-term use, derive `PROJECT_ROOT` from the script directory or deployment configuration.
+
+### 10.2 Catalog file not found
+
+Check the file:
+
+```bash
+ls catalog-mapping.xlsx
+```
+
+Run:
+
+```bash
+python file_directory_predictor.py sample.pdf --catalog ./catalog-mapping.xlsx
+```
+
+### 10.3 LLM or VLM returns nothing
+
+Check:
+
+```bash
+AI_BASE_URL
+AI_API_KEY
+AI_MODEL
+```
+
+Or dedicated variables:
+
+```bash
+AI_CHAT_BASE_URL / AI_CHAT_API_KEY / AI_CHAT_MODEL
+AI_VISION_BASE_URL / AI_VISION_API_KEY / AI_VISION_MODEL
+```
+
+Enable debug:
+
+```bash
+export AI_DEBUG=1
+```
+
+PowerShell:
+
+```powershell
+$env:AI_DEBUG = "1"
+```
+
+### 10.4 Poor PDF recognition
+
+Increase:
+
+```python
+MAX_PDF_PAGES_FOR_VLM = 5
+```
+
+### 10.5 Key content is not at the beginning
+
+Increase:
+
+```python
+MAX_TEXT_CHARS = 12000
+```
+
+## 11. Test Reports
+
+The repository includes an end-to-end run:
+
+```text
+test-reports/full-chain-input.txt
+test-reports/full-chain-run.json
+test-reports/full-chain-report.json
+test-reports/full-chain-report.md
+```
+
+The report covers environment-based model configuration, real HTTP request/response records, text extraction, LLM analysis, candidate retrieval, and final JSON output.
+
+## 12. Security Notes
+
+- Do not commit real API keys.
+- Mask Authorization headers before sharing logs.
+- Do not commit sensitive case materials to a public repository.

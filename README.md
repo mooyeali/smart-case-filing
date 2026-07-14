@@ -1,68 +1,73 @@
-# Smart Case Filing
+# 卷宗智能推理编目
 
-> 中文为默认文档语言。English version follows the Chinese version.
+[English](README.en.md)
 
-## 中文版
+Smart Case Filing 是一个面向法院电子卷宗材料的智能目录推测工具。它读取 PDF、Word、图片、表格和文本文件，结合本地编目规则表、文本模型与视觉模型，推测材料应归入的案件类型、卷宗、二级目录和材料类别。
 
-Smart Case Filing 是一个面向法院卷宗材料的智能目录推测工具。它读取待归档文件内容，结合文本模型、视觉模型和 `catalog-mapping.xlsx` 编目规则表，推测文件应归属的案件类型、卷宗、二级目录和材料类别。
+当前项目以单文件 Python 脚本为核心，适合本地批处理、编目规则验证、模型接入验证，以及接入业务系统前的原型验证。
 
-当前实现以单文件 Python 脚本为核心，适合本地批处理、规则验证、模型接入验证和后续系统集成前的原型验证。
+## 核心能力
 
-### 核心能力
+- 支持 PDF、Word、图片、表格、纯文本和常见结构化文本文件。
+- PDF 会提取文本，并可渲染前若干页供视觉模型分析。
+- 图片会发送给视觉模型进行版式识别和 OCR 线索提取。
+- 文本内容会发送给语义模型，生成文书类型、案件线索、关键词和摘要。
+- 本地基于 `catalog-mapping.xlsx` 召回候选编目规则，再由模型从候选中选择最终条目。
+- 支持 OpenAI-compatible HTTP API，通过环境变量配置 `base_url`、`api_key` 和 `model`。
+- 未配置完整 HTTP 模型参数时，保留 `z-ai` CLI fallback。
+- 支持把标准输出和日志分别保存到文件，便于归档和复核。
 
-- 支持 PDF、Word、图片、表格和纯文本文件。
-- PDF 会提取文本，并把前几页渲染为图片供视觉模型分析。
-- 图片文件会交给视觉模型进行版式识别和 OCR。
-- 文本内容会交给语义模型判断文书类型、案件线索和关键短语。
-- 本地从编目规则表中召回候选目录，再由模型精选最匹配条目。
-- 支持 OpenAI-compatible HTTP API，可通过环境变量自定义 `base_url`、`api_key` 和 `model`。
-- 未配置 HTTP 模型三件套时，保留旧的 `z-ai` CLI fallback。
-
-### 工作流程
+## 工作流程
 
 ```text
 输入文件
-  -> ContentExtractor 提取文本/图片
-  -> VLMAnalyzer 分析视觉材料和 OCR
+  -> ContentExtractor 提取文本和图片
+  -> VLMAnalyzer 分析视觉材料和 OCR 线索
   -> LLMAnalyzer 分析文本语义画像
-  -> CatalogIndex 本地召回候选编目规则
+  -> CatalogIndex 召回候选编目规则
   -> DirectoryPredictor 调用模型精选候选
   -> 输出预测目录和分析结果
 ```
 
-最终目录由以下字段拼接：
+预测目录由以下字段组成：
 
 ```text
 案件类型 / 卷宗 / 二级目录 / 材料类别
 ```
 
-### 支持的文件类型
+## 支持的文件类型
 
 | 类型 | 扩展名 | 处理方式 |
 | --- | --- | --- |
-| PDF | `.pdf` | PyMuPDF 提取文本，并渲染前 N 页供视觉模型分析 |
-| Word 新格式 | `.docx` | `python-docx` 提取段落和表格文本 |
+| PDF | `.pdf` | 使用 PyMuPDF 提取文本，并渲染前 N 页供视觉模型分析 |
+| Word 新格式 | `.docx` | 使用 `python-docx` 提取段落和表格文本 |
 | Word 老格式 | `.doc` | 通过 LibreOffice 转换为 `.docx` 后提取 |
-| 图片 | `.png` `.jpg` `.jpeg` `.gif` `.webp` `.bmp` | 交给视觉模型识别和 OCR |
-| 表格 | `.xlsx` `.xlsm` `.xls` | pandas 读取所有 sheet 的前 200 行 |
+| 图片 | `.png` `.jpg` `.jpeg` `.gif` `.webp` `.bmp` | 发送给视觉模型识别版式和 OCR |
+| 表格 | `.xlsx` `.xlsm` `.xls` | 使用 pandas 读取所有 sheet 的前 200 行 |
 | 文本 | `.txt` `.csv` `.tsv` `.md` `.json` `.log` `.xml` `.html` `.htm` | 尝试多编码读取 |
 | 其他 | 任意扩展名 | 兜底按文本读取 |
 
-### 快速开始
+## 快速开始
 
-安装 Python 依赖：
+安装依赖：
+
+```bash
+pip install -r requirements.txt
+```
+
+如果只安装运行所需依赖，也可以使用：
 
 ```bash
 pip install pandas openpyxl pymupdf python-docx requests
 ```
 
-如果需要处理 `.doc` 文件，还需要安装 LibreOffice，并确认命令可用：
+如需处理 `.doc` 文件，还需要安装 LibreOffice，并确认命令可用：
 
 ```bash
 libreoffice --version
 ```
 
-配置模型服务。推荐使用 OpenAI-compatible HTTP API：
+配置 OpenAI-compatible 模型服务：
 
 ```bash
 export AI_BASE_URL="https://api.openai.com/v1"
@@ -90,7 +95,22 @@ python file_directory_predictor.py ./sample.pdf --catalog ./catalog-mapping.xlsx
 python file_directory_predictor.py --batch ./input-files --catalog ./catalog-mapping.xlsx --json
 ```
 
-### 模型配置
+保存结果和日志到指定文件：
+
+```bash
+python file_directory_predictor.py ./sample.pdf \
+  --catalog ./catalog-mapping.xlsx \
+  --json \
+  --output ./logs/result.json \
+  --log ./logs/run.log
+```
+
+未显式指定 `--output` 和 `--log` 时，程序会在脚本所在目录写入：
+
+- `file_directory_predictor_output.txt`：原 stdout 内容。
+- `file_directory_predictor.log`：原 stderr 内容。
+
+## 模型配置
 
 通用环境变量：
 
@@ -100,20 +120,20 @@ python file_directory_predictor.py --batch ./input-files --catalog ./catalog-map
 | `AI_API_KEY` | API key |
 | `AI_MODEL` | 默认模型名 |
 
-文本模型覆盖：
+文本模型专用覆盖：
 
 | 环境变量 | 含义 |
 | --- | --- |
-| `AI_CHAT_BASE_URL` | 文本模型专用 API 地址 |
-| `AI_CHAT_API_KEY` | 文本模型专用 API key |
+| `AI_CHAT_BASE_URL` | 文本模型 API 地址 |
+| `AI_CHAT_API_KEY` | 文本模型 API key |
 | `AI_CHAT_MODEL` | 文本模型名 |
 
-视觉模型覆盖：
+视觉模型专用覆盖：
 
 | 环境变量 | 含义 |
 | --- | --- |
-| `AI_VISION_BASE_URL` | 视觉模型专用 API 地址 |
-| `AI_VISION_API_KEY` | 视觉模型专用 API key |
+| `AI_VISION_BASE_URL` | 视觉模型 API 地址 |
+| `AI_VISION_API_KEY` | 视觉模型 API key |
 | `AI_VISION_MODEL` | 视觉模型名 |
 
 读取优先级：
@@ -123,14 +143,20 @@ chat   : AI_CHAT_*   -> AI_*
 vision : AI_VISION_* -> AI_*
 ```
 
-如果没有配置完整的 `base_url`、`api_key`、`model` 三件套，脚本会回退到旧的 `z-ai` CLI：
+调试模型调用失败原因时，可开启：
+
+```bash
+export AI_DEBUG=1
+```
+
+如果没有配置完整的 `base_url`、`api_key`、`model` 三件套，脚本会回退到：
 
 ```bash
 z-ai chat
 z-ai vision
 ```
 
-### 编目规则表
+## 编目规则表
 
 `catalog-mapping.xlsx` 至少需要包含以下列：
 
@@ -143,274 +169,92 @@ material_category
 catalog_name_example
 ```
 
-当前仓库中的规则表用于本地候选召回。模型最终只能从召回出的候选编号中选择；代码会优先用 `selected_index` 反写规则表字段，避免模型自由编造不存在的目录字段。
+程序先从规则表中召回候选，再要求模型只能从候选编号中选择。最终结果优先根据 `selected_index` 回写规则表字段，减少模型自由编造目录的风险。
 
-### 重要路径配置
+## 路径和运行输出
 
-当前脚本顶部仍保留原始默认路径：
+当前脚本默认配置位于 `file_directory_predictor.py` 顶部：
 
 ```python
-PROJECT_ROOT = Path("/home/z/my-project")
-DEFAULT_CATALOG = PROJECT_ROOT / "upload" / "6a54a3afc78fec0fe9e6aa28_catalog-mapping.xlsx"
+PROJECT_ROOT = Path("/Users/mooye/python project/smart-case-filing")
+PROGRAM_DIR = Path(__file__).resolve().parent
+DEFAULT_CATALOG = PROJECT_ROOT / "catalog-mapping.xlsx"
 TMP_DIR = PROJECT_ROOT / "scripts" / "_tmp_predict"
 ```
 
-在本仓库目录使用时，建议运行命令时显式传入：
+为了提升跨环境可移植性，建议在命令行显式传入 `--catalog`、`--output` 和 `--log`。如果要部署到其他机器，优先把这些路径改为基于脚本目录或部署配置生成。
 
-```bash
---catalog ./catalog-mapping.xlsx
-```
-
-如需长期使用，建议后续把 `PROJECT_ROOT` 调整为基于脚本所在目录的动态路径。
-
-### 仓库结构
+## 仓库结构
 
 ```text
 .
-├── file_directory_predictor.py          # 主程序
-├── catalog-mapping.xlsx                 # 编目规则表
-├── file_directory_predictor_usage.md    # 使用文档，中英双语
+├── file_directory_predictor.py           # 主程序
+├── catalog-mapping.xlsx                  # 编目规则表
+├── README.md                             # 中文说明
+├── README.en.md                          # English README
 ├── docs/
-│   └── model-env-config-design.md       # 模型环境变量配置设计文档
-└── test-reports/
-    ├── full-chain-input.txt             # 全链路测试输入
-    ├── full-chain-run.json              # 原始运行记录
-    ├── full-chain-report.json           # JSON 测试报告
-    └── full-chain-report.md             # Markdown 测试报告
+│   ├── 卷宗智能推理编目使用说明.md              # 中文使用说明
+│   ├── Smart_Case_Filing_Usage.en.md     # English usage guide
+│   └── 处理结果字段解释.md                 # 预测结果字段说明
+├── logs/                                 # 运行日志和输出样例
+├── offline_pkgs/                         # 离线依赖包
+├── test-reports/                         # 全链路验证报告
+└── tests/                                # 单元测试
 ```
 
-### 验证记录
+## 结果字段说明
 
-本项目已完成一次 OpenAI-compatible 模型配置全链路测试，报告位于：
+JSON 输出的主要字段包括：
 
-- `test-reports/full-chain-report.md`
-- `test-reports/full-chain-report.json`
-- `test-reports/full-chain-run.json`
+- `file_path`、`file_type`：输入文件路径和识别类型。
+- `predicted_case_type`、`predicted_volume`、`predicted_second_level_directory`、`predicted_material_category`：最终预测目录字段。
+- `predicted_catalog_example`：命中规则中的编目名称示例。
+- `confidence`、`reasoning`：置信度和选择理由。
+- `vlm_analysis`：视觉模型分析结果。
+- `llm_analysis`：文本模型分析结果。
+- `matched_entries`：最终命中的编目规则。
 
-测试覆盖：
+更完整的字段解释见 [docs/处理结果字段解释.md](docs/处理结果字段解释.md)。
 
-- 环境变量模型配置。
-- 文件内容提取。
-- 文本语义分析。
-- 本地候选召回。
-- 模型精选候选。
-- JSON 输出。
+完整命令行使用说明见 [docs/卷宗智能推理编目使用说明.md](docs/卷宗智能推理编目使用说明.md)。
 
-### 安全说明
+## 验证和测试
+
+运行单元测试：
+
+```bash
+python -m unittest discover -s tests
+```
+
+运行语法检查：
+
+```bash
+python -m py_compile file_directory_predictor.py tests/test_catalog_index.py tests/test_cli_output.py
+```
+
+项目包含一次 OpenAI-compatible 模型配置全链路验证记录：
+
+- [test-reports/full-chain-report.md](test-reports/full-chain-report.md)
+- [test-reports/full-chain-report.json](test-reports/full-chain-report.json)
+- [test-reports/full-chain-run.json](test-reports/full-chain-run.json)
+
+## 安全说明
 
 - 不要把真实 API key 写入代码、文档或提交记录。
-- 测试报告中展示的 Authorization 已脱敏。
-- 如果需要共享运行记录，请先确认没有包含未脱敏密钥或敏感案件材料。
+- 共享日志和报告前，检查是否包含未脱敏密钥、Authorization header 或敏感案件材料。
+- 测试报告中出现的 Authorization 信息应保持脱敏。
 
-### 已知限制
+## 已知限制
 
-- 候选召回依赖关键词匹配，召回质量会影响最终目录。
-- 文本分析默认只取前 `MAX_TEXT_CHARS` 个字符。
+- 候选召回依赖关键词和规则表质量，召回不足会影响最终预测。
+- 文本分析默认只截取前 `MAX_TEXT_CHARS` 个字符。
 - PDF 视觉分析默认只渲染前 `MAX_PDF_PAGES_FOR_VLM` 页。
-- OpenAI-compatible 视觉请求采用 `image_url` data URI 格式，目标服务需要支持该格式。
+- OpenAI-compatible 视觉请求使用 `image_url` data URI，目标服务需要支持该格式。
 - `.doc` 文件依赖系统 LibreOffice。
+- 当前默认路径仍带有本机项目路径，跨机器运行建议显式传参或改为动态配置。
 
-### 许可证
+## 许可证
 
-当前仓库未声明开源许可证。发布或商用前应补充明确许可证。
+本项目采用非商业许可。未经项目权利人另行书面授权，代码、文档、规则表和示例材料仅可用于学习、研究、评估、内部验证和非商业原型开发，不得用于营利性产品、商业交付、商业 SaaS 服务或其他商业场景。
 
----
-
-## English Version
-
-Smart Case Filing is an intelligent directory prediction tool for court case filing materials. It reads an input document, combines text-model analysis, vision-model analysis, and the `catalog-mapping.xlsx` catalog rules, then predicts the case type, volume, second-level directory, and material category.
-
-The current implementation is a single-file Python tool suitable for local batch processing, catalog-rule validation, model-integration testing, and prototyping before system integration.
-
-### Key Features
-
-- Supports PDF, Word, images, spreadsheets, and text files.
-- Extracts text from PDFs and renders the first pages for vision-model analysis.
-- Sends image files to the vision model for layout recognition and OCR.
-- Sends extracted text to the language model for document-type and case-clue analysis.
-- Retrieves local candidate catalog rules, then asks the model to select the best candidate.
-- Supports OpenAI-compatible HTTP APIs through environment variables for `base_url`, `api_key`, and `model`.
-- Falls back to the legacy `z-ai` CLI when the HTTP model configuration is incomplete.
-
-### Workflow
-
-```text
-Input file
-  -> ContentExtractor extracts text/images
-  -> VLMAnalyzer analyzes visual materials and OCR
-  -> LLMAnalyzer builds a text semantic profile
-  -> CatalogIndex retrieves candidate catalog rules locally
-  -> DirectoryPredictor asks the model to select the best candidate
-  -> Predicted directory and analysis result
-```
-
-The final predicted path is:
-
-```text
-case type / volume / second-level directory / material category
-```
-
-### Supported File Types
-
-| Type | Extensions | Processing |
-| --- | --- | --- |
-| PDF | `.pdf` | Extract text with PyMuPDF and render the first N pages for vision analysis |
-| Word | `.docx` | Extract paragraphs and table text with `python-docx` |
-| Legacy Word | `.doc` | Convert to `.docx` with LibreOffice, then extract text |
-| Image | `.png` `.jpg` `.jpeg` `.gif` `.webp` `.bmp` | Send to the vision model for recognition and OCR |
-| Spreadsheet | `.xlsx` `.xlsm` `.xls` | Read the first 200 rows of all sheets with pandas |
-| Text | `.txt` `.csv` `.tsv` `.md` `.json` `.log` `.xml` `.html` `.htm` | Try multiple encodings |
-| Other | any extension | Fallback to text extraction |
-
-### Quick Start
-
-Install Python dependencies:
-
-```bash
-pip install pandas openpyxl pymupdf python-docx requests
-```
-
-Install LibreOffice if you need `.doc` support:
-
-```bash
-libreoffice --version
-```
-
-Configure an OpenAI-compatible model service:
-
-```bash
-export AI_BASE_URL="https://api.openai.com/v1"
-export AI_API_KEY="sk-..."
-export AI_MODEL="gpt-4.1"
-```
-
-PowerShell:
-
-```powershell
-$env:AI_BASE_URL = "https://api.openai.com/v1"
-$env:AI_API_KEY = "sk-..."
-$env:AI_MODEL = "gpt-4.1"
-```
-
-Run single-file prediction:
-
-```bash
-python file_directory_predictor.py ./sample.pdf --catalog ./catalog-mapping.xlsx --json
-```
-
-Run batch prediction:
-
-```bash
-python file_directory_predictor.py --batch ./input-files --catalog ./catalog-mapping.xlsx --json
-```
-
-### Model Configuration
-
-Generic variables:
-
-| Variable | Meaning |
-| --- | --- |
-| `AI_BASE_URL` | OpenAI-compatible API base URL |
-| `AI_API_KEY` | API key |
-| `AI_MODEL` | Default model name |
-
-Chat overrides:
-
-| Variable | Meaning |
-| --- | --- |
-| `AI_CHAT_BASE_URL` | Chat-model base URL |
-| `AI_CHAT_API_KEY` | Chat-model API key |
-| `AI_CHAT_MODEL` | Chat-model name |
-
-Vision overrides:
-
-| Variable | Meaning |
-| --- | --- |
-| `AI_VISION_BASE_URL` | Vision-model base URL |
-| `AI_VISION_API_KEY` | Vision-model API key |
-| `AI_VISION_MODEL` | Vision-model name |
-
-Priority:
-
-```text
-chat   : AI_CHAT_*   -> AI_*
-vision : AI_VISION_* -> AI_*
-```
-
-If `base_url`, `api_key`, and `model` are not fully configured, the script falls back to:
-
-```bash
-z-ai chat
-z-ai vision
-```
-
-### Catalog Rules
-
-`catalog-mapping.xlsx` must contain at least:
-
-```text
-case_type
-volume
-second_level_directory
-constraint
-material_category
-catalog_name_example
-```
-
-The model is expected to select from locally retrieved candidate rules. The code trusts `selected_index` first and writes back the exact fields from the selected catalog entry to reduce hallucinated catalog fields.
-
-### Important Path Note
-
-The script still contains the original default paths:
-
-```python
-PROJECT_ROOT = Path("/home/z/my-project")
-DEFAULT_CATALOG = PROJECT_ROOT / "upload" / "6a54a3afc78fec0fe9e6aa28_catalog-mapping.xlsx"
-TMP_DIR = PROJECT_ROOT / "scripts" / "_tmp_predict"
-```
-
-When running from this repository, pass the catalog explicitly:
-
-```bash
---catalog ./catalog-mapping.xlsx
-```
-
-For long-term use, consider changing `PROJECT_ROOT` to a dynamic path based on the script location.
-
-### Repository Layout
-
-```text
-.
-├── file_directory_predictor.py
-├── catalog-mapping.xlsx
-├── file_directory_predictor_usage.md
-├── docs/
-│   └── model-env-config-design.md
-└── test-reports/
-    ├── full-chain-input.txt
-    ├── full-chain-run.json
-    ├── full-chain-report.json
-    └── full-chain-report.md
-```
-
-### Verification
-
-An end-to-end OpenAI-compatible model test has been completed. Reports are available in `test-reports/`.
-
-### Security Notes
-
-- Do not commit real API keys.
-- Authorization headers in test reports are masked.
-- Review run records before sharing them externally.
-
-### Known Limitations
-
-- Candidate retrieval quality depends on keyword matching.
-- Text analysis uses only the first `MAX_TEXT_CHARS` characters.
-- PDF vision analysis renders only the first `MAX_PDF_PAGES_FOR_VLM` pages.
-- Vision requests use `image_url` data URI payloads, which must be supported by the target service.
-- `.doc` support requires LibreOffice.
-
-### License
-
-No open-source license has been declared yet. Add a license before public release or commercial use.
+完整条款见 [LICENSE.md](LICENSE.md)。如需商业使用、二次分发或集成到商业系统，请先取得项目权利人的书面授权。

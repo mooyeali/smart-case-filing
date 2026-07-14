@@ -1,13 +1,13 @@
-# OpenAI-compatible ???????????
+# OpenAI-compatible 模型配置全链路验证报告
 
-- ????: `PASS`
-- HTTP ??????: `2`
-- ????: `test-reports/full-chain-input.txt`
-- ???: `0`
+- 验证状态: `PASS`
+- HTTP 调用次数: `2`
+- 测试文件: `test-reports/full-chain-input.txt`
+- 退出码: `0`
 
-## 1. ??
+## 1. 输入
 
-### 1.1 ??
+### 1.1 命令
 ```json
 [
   "C:\\Python314\\python.exe",
@@ -19,7 +19,7 @@
 ]
 ```
 
-### 1.2 ????
+### 1.2 环境变量
 ```json
 {
   "AI_BASE_URL": "https://apihub.agnes-ai.com/v1",
@@ -30,7 +30,7 @@
 }
 ```
 
-### 1.3 ??????
+### 1.3 测试文件内容
 ```text
 民事起诉状
 
@@ -54,11 +54,11 @@
 
 ```
 
-## 2. ?? HTTP ??????????
+## 2. 捕获的 HTTP 请求和响应
 
-### 2.1 HTTP ?? 1
+### 2.1 HTTP 调用 1
 
-#### ??
+#### 请求
 ```json
 {
   "method": "POST",
@@ -84,7 +84,7 @@
 }
 ```
 
-#### ???
+#### 响应
 ```json
 {
   "status_code": 200,
@@ -127,9 +127,9 @@
 }
 ```
 
-### 2.2 HTTP ?? 2
+### 2.2 HTTP 调用 2
 
-#### ??
+#### 请求
 ```json
 {
   "method": "POST",
@@ -155,7 +155,7 @@
 }
 ```
 
-#### ???
+#### 响应
 ```json
 {
   "status_code": 200,
@@ -198,7 +198,7 @@
 }
 ```
 
-## 3. ???????
+## 3. 程序输出
 
 ### 3.1 stdout JSON
 ```json
@@ -245,6 +245,6 @@
 
 ```
 
-## 4. ??????
+## 4. 报告文件
 
-??????? `test-reports/full-chain-run.json`?JSON ???? `test-reports/full-chain-report.json`?
+原始运行记录见 `test-reports/full-chain-run.json`，JSON 报告见 `test-reports/full-chain-report.json`。
