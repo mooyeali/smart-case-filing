@@ -210,9 +210,9 @@ If `--output` and `--log` are not provided, the program writes default files und
 
 The current batch mode does not recurse into subdirectories.
 
-## 7. Single-file Agent Mode
+## 7. Batch-resumable Agent Mode
 
-Single-file agent mode is for cataloging tasks that need an execution trace, low-confidence review, and a minimal resume summary. It uses the same OpenAI-compatible HTTP API configuration and legacy `z-ai` fallback as the normal predictor, and reuses the existing extraction, visual analysis, text analysis, and catalog candidate rules.
+Agent mode is for cataloging tasks that need execution traces, low-confidence review, batch summaries, and resumable runs. It uses the same OpenAI-compatible HTTP API configuration and legacy `z-ai` fallback as the normal predictor, and reuses the existing extraction, visual analysis, text analysis, and catalog candidate rules.
 
 ```bash
 python file_directory_predictor.py ./sample.pdf \
@@ -225,14 +225,36 @@ python file_directory_predictor.py ./sample.pdf \
 
 Agent mode keeps the normal JSON output fields compatible and adds `agent_state`, `trace`, `review_output`, `resume`, and related agent fields.
 
+Batch agent example:
+
+```bash
+python file_directory_predictor.py \
+  --batch ./input-files \
+  --catalog ./catalog-mapping.xlsx \
+  --agent \
+  --trace ./agent-runs/demo \
+  --json
+```
+
+Batch mode only processes direct files in the specified directory. In batch agent mode, `--trace` is treated as the run directory and the run writes:
+
+```text
+agent-runs/<run_id>/
+  manifest.json
+  traces/<file_id>.trace.jsonl
+  reviews/<file_id>.review.json
+  reviews/index.json
+  outputs/<file_id>.json
+```
+
 Arguments:
 
 | Argument | Meaning |
 | --- | --- |
-| `--agent` | Enables the single-file agent state machine. |
-| `--trace <path>` | Writes each execution step to a JSONL trace file. If omitted, the default is `agent_trace.jsonl` under the program directory. |
+| `--agent` | Enables the agent state machine. |
+| `--trace <path>` | In single-file mode, writes a JSONL trace; in batch mode, acts as the run directory. |
 | `--review-output <path>` | Writes a human review JSON package when the state is `NEEDS_REVIEW` or `FAILED`. |
-| `--resume <trace>` | Reads the last state from an existing trace and prints a resume summary. Phase two does not continue execution from a partial step. |
+| `--resume <trace-or-manifest>` | Resumes from a single-file trace or batch manifest. Terminal states are not rerun; partial states attempt to continue from the next step. |
 
 Each trace JSONL line is one step record:
 
@@ -251,6 +273,8 @@ Each trace JSONL line is one step record:
 
 The review package contains `file_path`, `agent_state`, `confidence`, `reasoning`, `trace`, `candidate_summaries`, `llm_analysis`, `vlm_analysis`, `error`, and `created_at`. API keys and similar secrets are redacted before the file is written.
 
+For batch runs, `manifest.json` records each file's state, confidence, trace, review, output, and error summary. `reviews/index.json` indexes all `NEEDS_REVIEW` and `FAILED` files for centralized review.
+
 Resume example:
 
 ```bash
@@ -260,11 +284,22 @@ python file_directory_predictor.py \
   --json
 ```
 
-Phase-two limitations:
+Batch resume example:
 
-- No batch agent mode; use the regular `--batch` path for batch processing.
-- No partial resume; if the last state is not `COMPLETED`, `NEEDS_REVIEW`, or `FAILED`, the command returns an explicit failed response.
-- No tool-level retry policy yet; failures enter `FAILED` and should be inspected through the review package.
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --resume ./agent-runs/demo/manifest.json \
+  --catalog ./catalog-mapping.xlsx \
+  --json
+```
+
+Phase-three behavior and limitations:
+
+- Batch agent mode is supported, but still only processes direct files in the target directory.
+- Partial resume is supported; if trace summaries are insufficient to resume safely, the command returns a clear failed response.
+- Tool calls use a retry policy. The default remains one attempt; tests and future callers can configure attempts, backoff, and retryable errors.
+- Real model smoke tests require `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL`, or an available legacy `z-ai` CLI fallback.
 
 ## 8. Output Fields
 

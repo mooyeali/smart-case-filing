@@ -1,0 +1,47 @@
+{
+  "command": "python file_directory_predictor.py --batch ./test-reports/agent-phase-three-input --catalog ./catalog-mapping.xlsx --agent --trace ./agent-runs/phase-three-fake --json",
+  "input_files": [
+    "completed.txt",
+    "review.txt",
+    "failed.txt"
+  ],
+  "fake_model_behavior": {
+    "completed.txt": {
+      "candidate_count": 1,
+      "confidence": "high",
+      "agent_state": "COMPLETED"
+    },
+    "review.txt": {
+      "candidate_count": 1,
+      "confidence": "low",
+      "agent_state": "NEEDS_REVIEW"
+    },
+    "failed.txt": {
+      "candidate_count": 0,
+      "error": "no catalog candidates",
+      "agent_state": "FAILED"
+    }
+  },
+  "run_directory": {
+    "manifest": "agent-runs/phase-three-fake/manifest.json",
+    "traces": "agent-runs/phase-three-fake/traces/<file_id>.trace.jsonl",
+    "reviews": "agent-runs/phase-three-fake/reviews/<file_id>.review.json",
+    "review_index": "agent-runs/phase-three-fake/reviews/index.json",
+    "outputs": "agent-runs/phase-three-fake/outputs/<file_id>.json"
+  },
+  "status_counts": {
+    "COMPLETED": 1,
+    "NEEDS_REVIEW": 1,
+    "FAILED": 1
+  },
+  "resume_command": "python file_directory_predictor.py --agent --resume ./agent-runs/phase-three-fake/manifest.json --catalog ./catalog-mapping.xlsx --json",
+  "resume_expected": {
+    "agent_state": "BATCH_RESUMED",
+    "resumed_count": 0,
+    "skipped_count": 3
+  },
+  "test_commands": [
+    "python -m unittest tests/test_agent_full_chain.py",
+    "python -m unittest discover -s tests"
+  ]
+}
