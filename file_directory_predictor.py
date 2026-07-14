@@ -51,6 +51,7 @@ from smart_case_filing.agent.legacy_tools import build_legacy_tool_registry
 from smart_case_filing.agent.review import ReviewPackageWriter, build_review_payload
 from smart_case_filing.agent.run_manager import AgentRunManager
 from smart_case_filing.agent.runner import AgentRunner
+from smart_case_filing.agent.retry import RetryPolicy
 from smart_case_filing.agent.state import AgentState, AgentTraceStore
 
 try:
@@ -1120,7 +1121,7 @@ def _run_agent_cli(args):
     catalog = CatalogLoader(catalog_path).load()
     trace_store = AgentTraceStore(trace_path)
     registry = build_legacy_tool_registry(catalog)
-    runner = AgentRunner(registry, trace_store)
+    runner = AgentRunner(registry, trace_store, retry_policy=_agent_retry_policy_from_args(args))
     run_id = f"agent-{int(time.time() * 1000)}"
     result = runner.run(run_id=run_id, file_path=str(file_path))
     output = _agent_output_from_result(result, trace_path, args.review_output or "", args.resume or "")
@@ -1145,6 +1146,17 @@ def _agent_output_from_result(result: dict, trace_path: Path, review_output: str
     if result.get("error"):
         output["error"] = result["error"]
     return output
+
+
+def _agent_retry_policy_from_args(args) -> RetryPolicy:
+    errors = getattr(args, "agent_retry_errors", "") or ""
+    retryable_errors = tuple(part.strip().lower() for part in errors.split(",") if part.strip())
+    return RetryPolicy(
+        max_attempts=max(1, int(getattr(args, "agent_retry_attempts", 1) or 1)),
+        initial_delay_seconds=max(0.0, float(getattr(args, "agent_retry_delay", 0.0) or 0.0)),
+        backoff_factor=max(1.0, float(getattr(args, "agent_retry_backoff", 2.0) or 2.0)),
+        retryable_errors=retryable_errors or RetryPolicy().retryable_errors,
+    )
 
 
 def _agent_batch_root(args) -> Path:
@@ -1190,7 +1202,7 @@ def _run_agent_batch_cli(args):
     for file_path in files:
         paths = manager.paths_for(str(file_path))
         trace_store = AgentTraceStore(paths["trace"])
-        runner = AgentRunner(registry, trace_store)
+        runner = AgentRunner(registry, trace_store, retry_policy=_agent_retry_policy_from_args(args))
         result = runner.run(run_id=manager.run_id, file_path=str(file_path))
         review_path = str(paths["review"])
         output = _agent_output_from_result(result, paths["trace"], review_path, args.resume or "")
@@ -1285,7 +1297,7 @@ def _resume_agent_trace(args, trace_path: Path, steps: list) -> dict:
 
     catalog = CatalogLoader(catalog_path).load()
     registry = build_legacy_tool_registry(catalog)
-    runner = AgentRunner(registry, AgentTraceStore(trace_path))
+    runner = AgentRunner(registry, AgentTraceStore(trace_path), retry_policy=_agent_retry_policy_from_args(args))
     result = runner.resume(run_id=last.run_id, file_path=last.file_path, steps=steps)
     output = _agent_output_from_result(result, trace_path, args.review_output or "", args.resume or "")
     output.update({
@@ -1381,6 +1393,10 @@ def main():
     parser.add_argument("--trace", help="智能体执行轨迹 JSONL 保存路径")
     parser.add_argument("--review-output", help="需要人工复核时输出复核材料的路径")
     parser.add_argument("--resume", help="从已有 trace JSONL 恢复智能体任务")
+    parser.add_argument("--agent-retry-attempts", type=int, default=1, help="智能体工具调用最大尝试次数")
+    parser.add_argument("--agent-retry-delay", type=float, default=0.0, help="智能体重试初始等待秒数")
+    parser.add_argument("--agent-retry-backoff", type=float, default=2.0, help="智能体重试退避倍率")
+    parser.add_argument("--agent-retry-errors", default="", help="逗号分隔的可重试错误关键字")
     args = parser.parse_args()
 
     if not args.file and not args.batch and not (args.agent and args.resume):
