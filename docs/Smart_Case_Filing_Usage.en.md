@@ -1,4 +1,4 @@
-# file_directory_predictor.py English Usage Guide
+﻿# file_directory_predictor.py English Usage Guide
 
 [中文使用说明](卷宗智能推理编目使用说明.md)
 
@@ -210,7 +210,22 @@ If `--output` and `--log` are not provided, the program writes default files und
 
 The current batch mode does not recurse into subdirectories.
 
-## 7. Output Fields
+## 7. Agent Mode
+
+Agent mode is for cataloging tasks that need execution trace, low-confidence review, and resume support.
+
+```bash
+python file_directory_predictor.py ./sample.pdf \
+  --catalog ./catalog-mapping.xlsx \
+  --agent \
+  --trace ./logs/sample.trace.jsonl \
+  --review-output ./logs/sample.review.json \
+  --json
+```
+
+Agent mode keeps the normal JSON output fields compatible and writes additional step traces to the JSONL file passed through `--trace`.
+
+## 8. Output Fields
 
 Example JSON shape:
 
@@ -246,7 +261,7 @@ Example JSON shape:
 | `llm_analysis` | Text-model analysis |
 | `matched_entries` | Matched catalog entries |
 
-## 8. Internal Flow
+## 9. Internal Flow
 
 ### 8.1 Content Extraction
 
@@ -287,7 +302,7 @@ Vision payload uses `image_url` data URIs.
 
 The model selects one candidate index. The code trusts `selected_index` first and writes back exact fields from the selected catalog row.
 
-## 9. Tuning
+## 10. Tuning
 
 Common constants:
 
@@ -303,7 +318,7 @@ CLI_TIMEOUT = 180
 | `MAX_TEXT_CHARS` | Maximum text characters sent to the LLM |
 | `CLI_TIMEOUT` | Model-call timeout in seconds |
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### 10.1 Default path does not match the deployment environment
 
@@ -383,7 +398,7 @@ Increase:
 MAX_TEXT_CHARS = 12000
 ```
 
-## 11. Test Reports
+## 12. Test Reports
 
 The repository includes an end-to-end run:
 
@@ -396,8 +411,9 @@ test-reports/full-chain-report.md
 
 The report covers environment-based model configuration, real HTTP request/response records, text extraction, LLM analysis, candidate retrieval, and final JSON output.
 
-## 12. Security Notes
+## 13. Security Notes
 
 - Do not commit real API keys.
 - Mask Authorization headers before sharing logs.
 - Do not commit sensitive case materials to a public repository.
+
