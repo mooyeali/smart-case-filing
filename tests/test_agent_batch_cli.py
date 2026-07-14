@@ -92,6 +92,7 @@ class AgentBatchCliTest(unittest.TestCase):
             catalog_file = tmp_path / "catalog.xlsx"
             catalog_file.write_text("fake", encoding="utf-8")
             run_dir = tmp_path / "agent-run"
+            review_dir = tmp_path / "custom-reviews"
             output_file = tmp_path / "batch-output.json"
             log_file = tmp_path / "batch.log"
 
@@ -101,6 +102,7 @@ class AgentBatchCliTest(unittest.TestCase):
                 "--catalog", str(catalog_file),
                 "--agent",
                 "--trace", str(run_dir),
+                "--review-output", str(review_dir),
                 "--json",
                 "--output", str(output_file),
                 "--log", str(log_file),
@@ -113,6 +115,7 @@ class AgentBatchCliTest(unittest.TestCase):
             self.assertEqual("BATCH_COMPLETED", summary["agent_state"])
             self.assertEqual(2, summary["file_count"])
             self.assertTrue(Path(summary["review_index"]).exists())
+            self.assertEqual(review_dir / "index.json", Path(summary["review_index"]))
             self.assertEqual({
                 "COMPLETED": 1,
                 "NEEDS_REVIEW": 1,
@@ -129,6 +132,7 @@ class AgentBatchCliTest(unittest.TestCase):
             review_items = [item for item in manifest["files"] if item["agent_state"] == "NEEDS_REVIEW"]
             self.assertEqual(1, len(review_items))
             self.assertTrue(Path(review_items[0]["review"]).exists())
+            self.assertTrue(Path(review_items[0]["review"]).is_relative_to(review_dir))
 
 
 if __name__ == "__main__":

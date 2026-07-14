@@ -30,6 +30,16 @@ class AgentRunManagerTest(unittest.TestCase):
             self.assertEqual(Path(tmp) / "run-1" / "reviews" / f"{paths['file_id']}.review.json", paths["review"])
             self.assertEqual(Path(tmp) / "run-1" / "outputs" / f"{paths['file_id']}.json", paths["output"])
 
+    def test_can_use_external_reviews_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            review_dir = Path(tmp) / "custom-reviews"
+            manager = AgentRunManager(Path(tmp), run_id="run-1", reviews_dir=review_dir)
+            paths = manager.paths_for("cases/sample.txt")
+
+            self.assertEqual(review_dir / f"{paths['file_id']}.review.json", paths["review"])
+            index_path = manager.write_review_index()
+            self.assertEqual(review_dir / "index.json", index_path)
+
     def test_records_file_and_updates_status_counts(self):
         with tempfile.TemporaryDirectory() as tmp:
             manager = AgentRunManager(Path(tmp), run_id="run-1")

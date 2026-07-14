@@ -1180,7 +1180,10 @@ def _run_agent_batch_cli(args):
 
     catalog = CatalogLoader(catalog_path).load()
     registry = build_legacy_tool_registry(catalog)
-    manager = AgentRunManager(_agent_batch_root(args))
+    manager = AgentRunManager(
+        _agent_batch_root(args),
+        reviews_dir=Path(args.review_output) if args.review_output else None,
+    )
     manager.ensure()
 
     files = sorted([p for p in batch_dir.iterdir() if p.is_file()])

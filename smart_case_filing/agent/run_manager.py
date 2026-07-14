@@ -34,12 +34,12 @@ def state_value(state) -> str:
 
 
 class AgentRunManager:
-    def __init__(self, root: Path, run_id: str | None = None):
+    def __init__(self, root: Path, run_id: str | None = None, reviews_dir: Path | None = None):
         self.root = Path(root)
         self.run_id = run_id or make_run_id()
         self.run_dir = self.root / self.run_id if self.root.name != self.run_id else self.root
         self.traces_dir = self.run_dir / "traces"
-        self.reviews_dir = self.run_dir / "reviews"
+        self.reviews_dir = Path(reviews_dir) if reviews_dir else self.run_dir / "reviews"
         self.outputs_dir = self.run_dir / "outputs"
         self.manifest_path = self.run_dir / "manifest.json"
 
