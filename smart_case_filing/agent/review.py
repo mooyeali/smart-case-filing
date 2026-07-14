@@ -33,6 +33,29 @@ def build_review_payload(agent_result: dict, trace_path: str) -> dict:
     }
 
 
+def build_review_index_payload(manifest: dict) -> dict:
+    items = []
+    for item in manifest.get("files", []):
+        if item.get("agent_state") not in {"NEEDS_REVIEW", "FAILED"}:
+            continue
+        items.append({
+            "file_id": item.get("file_id", ""),
+            "file_path": item.get("file_path", ""),
+            "agent_state": item.get("agent_state", ""),
+            "confidence": item.get("confidence", ""),
+            "reasoning": item.get("reasoning", ""),
+            "trace": item.get("trace", ""),
+            "review": item.get("review", ""),
+            "error": item.get("error", ""),
+        })
+    return {
+        "run_id": manifest.get("run_id", ""),
+        "created_at": time.time(),
+        "review_count": len(items),
+        "items": items,
+    }
+
+
 class ReviewPackageWriter:
     def __init__(self, path: Path):
         self.path = Path(path)

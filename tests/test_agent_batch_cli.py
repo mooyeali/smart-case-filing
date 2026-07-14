@@ -112,6 +112,7 @@ class AgentBatchCliTest(unittest.TestCase):
             summary = json.loads(output_file.read_text(encoding="utf-8"))
             self.assertEqual("BATCH_COMPLETED", summary["agent_state"])
             self.assertEqual(2, summary["file_count"])
+            self.assertTrue(Path(summary["review_index"]).exists())
             self.assertEqual({
                 "COMPLETED": 1,
                 "NEEDS_REVIEW": 1,

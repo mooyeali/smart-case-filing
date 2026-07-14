@@ -1199,10 +1199,12 @@ def _run_agent_batch_cli(args):
 
         manager.record_file(str(file_path), output, paths)
 
+    review_index = manager.write_review_index()
     summary = manager.summary()
     summary.update({
         "agent_state": "BATCH_COMPLETED",
         "state": "BATCH_COMPLETED",
+        "review_index": str(review_index),
     })
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

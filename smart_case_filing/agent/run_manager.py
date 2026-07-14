@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from smart_case_filing.agent.state import AgentState
+from smart_case_filing.agent.review import ReviewPackageWriter, build_review_index_payload
 
 
 TERMINAL_STATES = {
@@ -87,6 +88,7 @@ class AgentRunManager:
             "file_path": str(file_path),
             "agent_state": state,
             "confidence": prediction.get("confidence", ""),
+            "reasoning": prediction.get("reasoning", ""),
             "trace": str(paths["trace"]),
             "review": str(paths["review"]) if state in {AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value} else "",
             "output": str(paths["output"]),
@@ -112,6 +114,12 @@ class AgentRunManager:
             "file_count": len(manifest.get("files", [])),
             "files": manifest.get("files", []),
         }
+
+    def write_review_index(self) -> Path:
+        manifest = self.load_manifest()
+        index_path = self.reviews_dir / "index.json"
+        ReviewPackageWriter(index_path).write(build_review_index_payload(manifest))
+        return index_path
 
     @staticmethod
     def _status_counts(files: list[dict]) -> dict:

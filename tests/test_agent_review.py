@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from smart_case_filing.agent.review import ReviewPackageWriter, build_review_payload
+from smart_case_filing.agent.review import ReviewPackageWriter, build_review_index_payload, build_review_payload
 
 
 class ReviewPackageWriterTest(unittest.TestCase):
@@ -76,6 +76,37 @@ class ReviewPackageWriterTest(unittest.TestCase):
             self.assertEqual("FAILED", data["agent_state"])
             self.assertEqual("case.pdf", data["file_path"])
             self.assertNotIn("sk-abcdef1234567890", raw)
+
+    def test_builds_review_index_payload(self):
+        payload = build_review_index_payload({
+            "run_id": "run-1",
+            "files": [
+                {
+                    "file_id": "ok",
+                    "file_path": "ok.txt",
+                    "agent_state": "COMPLETED",
+                },
+                {
+                    "file_id": "review",
+                    "file_path": "review.txt",
+                    "agent_state": "NEEDS_REVIEW",
+                    "confidence": "low",
+                    "reasoning": "ambiguous",
+                    "trace": "trace.jsonl",
+                    "review": "review.json",
+                },
+                {
+                    "file_id": "failed",
+                    "file_path": "failed.txt",
+                    "agent_state": "FAILED",
+                    "error": "model unavailable",
+                },
+            ],
+        })
+
+        self.assertEqual("run-1", payload["run_id"])
+        self.assertEqual(2, payload["review_count"])
+        self.assertEqual(["review", "failed"], [item["file_id"] for item in payload["items"]])
 
 
 if __name__ == "__main__":

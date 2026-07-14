@@ -67,6 +67,31 @@ class AgentRunManagerTest(unittest.TestCase):
             self.assertEqual(str(Path(tmp) / "run-1" / "manifest.json"), summary["manifest"])
             self.assertEqual(1, summary["file_count"])
 
+    def test_writes_review_index_for_reviewable_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            manager = AgentRunManager(Path(tmp), run_id="run-1")
+            manager.record_file("ok.txt", {
+                "agent_state": "COMPLETED",
+                "confidence": "high",
+            })
+            manager.record_file("review.txt", {
+                "agent_state": "NEEDS_REVIEW",
+                "confidence": "low",
+                "reasoning": "ambiguous",
+            })
+            manager.record_file("failed.txt", {
+                "agent_state": "FAILED",
+                "error": "Authorization: Bearer sk-1234567890abcdef",
+            })
+
+            index_path = manager.write_review_index()
+
+            raw = index_path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+            self.assertEqual(2, data["review_count"])
+            self.assertEqual({"NEEDS_REVIEW", "FAILED"}, {item["agent_state"] for item in data["items"]})
+            self.assertNotIn("sk-1234567890abcdef", raw)
+
 
 if __name__ == "__main__":
     unittest.main()
