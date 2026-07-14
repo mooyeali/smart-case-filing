@@ -291,6 +291,8 @@ class CatalogIndex:
     entries: list  # list[CatalogEntry]
     # 按材料类别聚合：material_category -> list[(case_type, volume, second_level_directory, example)]
     by_category: dict = field(default_factory=dict)
+    # 按案件类型聚合：case_type -> list[CatalogEntry]
+    by_case_type: dict = field(default_factory=dict)
     # 所有案件类型
     case_types: list = field(default_factory=list)
     # 所有材料类别（去重）
@@ -298,9 +300,11 @@ class CatalogIndex:
 
     def build(self):
         self.by_category.clear()
+        self.by_case_type.clear()
         for e in self.entries:
             key = e.material_category or ""
             self.by_category.setdefault(key, []).append(e)
+            self.by_case_type.setdefault(e.case_type, []).append(e)
         self.case_types = sorted({e.case_type for e in self.entries})
         self.categories = sorted({e.material_category for e in self.entries if e.material_category})
         return self
@@ -323,12 +327,22 @@ class CatalogIndex:
             lines.append(f"- 【{cat}】 卷宗:{'/'.join(vol_set)} | 二级目录:{' / '.join(dir_set[:3])} | 适用案件:{' / '.join(case_set)} | 示例:{ex}")
         return "\n".join(lines)
 
-    def search_candidates(self, keywords: list, top_n: int = 25) -> list:
+    def search_candidates(self, keywords: list, top_n: int = 25,
+                          case_number: str = "") -> list:
         """根据关键词列表，本地模糊检索最相关的编目条目（两阶段检索的第一阶段）。
+
+        若能从案号（通常来自父目录名）识别案件类型，则直接返回该案件类型下
+        的全部编目规则，不再按 top_n 截断。
 
         打分策略：对每条编目条目，统计其各字段中命中的关键词数，取 top_n。
         keywords 来自 LLM/VLM 提取的文档画像（文书类型、案件线索、关键短语等）。
         """
+        case_type = self._case_type_from_case_number(case_number)
+        if case_type:
+            entries = self.by_case_type.get(case_type, [])
+            if entries:
+                return list(entries)
+
         if not keywords:
             # 无关键词时返回各案件类型的代表性条目（封面/目录等通用项）
             seen = set()
@@ -371,6 +385,32 @@ class CatalogIndex:
             if len(result) >= top_n:
                 break
         return result
+
+    def _case_type_from_case_number(self, case_number: str) -> str:
+        """从案号文本中推导编目表中的案件类型名称。"""
+        text = str(case_number or "").strip()
+        if not text:
+            return ""
+
+        mappings = [
+            (r"民初", "民事一审案件编目规则"),
+            (r"民终", "民事二审案件编目规则"),
+            (r"民申", "民事申请再审审查案件编目规则"),
+            (r"民再", "民事再审案件编目规则"),
+            (r"刑初", "刑事一审案件编目规则"),
+            (r"刑终", "刑事二审案件编目规则"),
+            (r"刑申", "刑事申诉再审审查案件编目规则"),
+            (r"刑再", "刑事再审案件编目规则"),
+            (r"行初", "行政一审案件编目规则"),
+            (r"行终", "行政二审案件编目规则"),
+            (r"行申", "行政申请再审审查案件编目规则"),
+            (r"行再", "行政再审案件编目规则"),
+            (r"执", "首次执行案件编目规则"),
+        ]
+        for pattern, case_type in mappings:
+            if re.search(pattern, text):
+                return case_type
+        return ""
 
 
 class CatalogLoader:
@@ -762,6 +802,7 @@ class DirectoryPredictor:
             "volume": volume,
             "case_clues": case_clues,
             "key_info": key_info,
+            "case_number": fc.file_path.parent.name,
             "file_name": fc.file_path.name,
             "file_type": fc.file_type,
             "text_preview": fc.text_preview(800),
@@ -772,16 +813,20 @@ class DirectoryPredictor:
     def _match_catalog(self, fusion: dict) -> dict:
         """两阶段检索匹配编目规则。
 
-        阶段1（本地检索）：从 fusion 画像中提取关键词，在 3860 条编目中模糊检索 top-25 候选。
-        阶段2（LLM 精选）：把文件画像 + 25 条候选交给 LLM，让其选出最匹配的一条。
+        阶段1（本地检索）：优先根据案号推导案件类型，加载该案件类型下所有编目规则；
+        若无法推导，再从 fusion 画像中提取关键词进行本地模糊检索。
+        阶段2（LLM 精选）：把文件画像 + 候选条目交给 LLM，让其选出最匹配的一条。
         这样避免把全部编目摘要塞进 prompt（会超 ARG_MAX）。
         """
         # ---- 阶段1：提取关键词并本地检索 ----
         keywords = self._extract_keywords(fusion)
-        candidates = self.catalog.search_candidates(keywords, top_n=25)
+        candidates = self.catalog.search_candidates(
+            keywords,
+            case_number=fusion.get("case_number", ""),
+        )
         if not candidates:
             # 关键词没命中任何条目，退回到通用条目
-            candidates = self.catalog.search_candidates([], top_n=15)
+            candidates = self.catalog.search_candidates([])
 
         # 构造候选清单文本（编号 + 字段）
         cand_lines = []
@@ -810,6 +855,7 @@ class DirectoryPredictor:
             "}\n\n"
             "=== 文件分析画像 ===\n"
             f"文件名: {fusion.get('file_name')}\n"
+            f"案号/目录名: {fusion.get('case_number')}\n"
             f"文件类型: {fusion.get('file_type')}\n"
             f"推测文书类型: {fusion.get('doc_type')}\n"
             f"推测卷宗: {fusion.get('volume')}\n"

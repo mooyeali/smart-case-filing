@@ -291,9 +291,9 @@ POST {AI_VISION_BASE_URL or AI_BASE_URL}/chat/completions
 
 ### 8.4 候选召回
 
-`DirectoryPredictor._extract_keywords()` 从文书类型、案件线索、摘要、关键短语和文件名中提取关键词。
+`DirectoryPredictor` 会把文件父目录名作为案号线索传给 `CatalogIndex.search_candidates()`。
 
-`CatalogIndex.search_candidates()` 使用关键词在编目规则表中召回最多 25 条候选。
+`CatalogIndex.search_candidates()` 优先从案号识别案件类型（如 `民初`、`民终`、`刑初`、`行再`、`执`），并加载该案件类型下的所有编目规则。无法从案号识别案件类型时，才使用文书类型、案件线索、摘要、关键短语和文件名关键词进行候选召回。
 
 ### 8.5 候选精选
 
@@ -688,7 +688,9 @@ Vision payload uses `image_url` data URIs.
 
 ### 8.4 Candidate Retrieval
 
-`DirectoryPredictor._extract_keywords()` extracts keywords, and `CatalogIndex.search_candidates()` retrieves up to 25 candidates.
+`DirectoryPredictor` passes the file parent directory name to `CatalogIndex.search_candidates()` as the case-number clue.
+
+`CatalogIndex.search_candidates()` first tries to infer the case type from the case number, such as `民初`, `民终`, `刑初`, `行再`, or `执`, and loads all catalog rules for that case type. If the case type cannot be inferred from the case number, it falls back to keyword-based candidate retrieval using document type, case clues, summary, key phrases, and file name.
 
 ### 8.5 Candidate Selection
 
