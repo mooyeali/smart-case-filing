@@ -1,0 +1,56 @@
+{
+  "command": "python file_directory_predictor.py ./test-reports/full-chain-input.txt --catalog ./catalog-mapping.xlsx --agent --trace ./test-reports/agent-phase-two-fake-run.trace.jsonl --review-output ./test-reports/agent-phase-two-fake-run.review.json --json",
+  "input_file": "./test-reports/full-chain-input.txt",
+  "fake_model_behavior": {
+    "visual_analysis": "skipped for text input",
+    "text_analysis": {
+      "doc_type_guess": "Civil complaint",
+      "confidence": "high"
+    },
+    "candidate_count": 1,
+    "selection": "selected the only matching candidate"
+  },
+  "trace_excerpt": [
+    {
+      "state": "STARTED",
+      "tool": "start"
+    },
+    {
+      "state": "EXTRACTED",
+      "tool": "extract_content"
+    },
+    {
+      "state": "TEXT_ANALYZED",
+      "tool": "analyze_text"
+    },
+    {
+      "state": "CANDIDATES_RETRIEVED",
+      "tool": "retrieve_candidates"
+    },
+    {
+      "state": "MATCHED",
+      "tool": "select_catalog"
+    },
+    {
+      "state": "COMPLETED",
+      "tool": "finalize_prediction"
+    }
+  ],
+  "json_output": {
+    "file_path": "./test-reports/full-chain-input.txt",
+    "file_type": "text",
+    "predicted_case_type": "Civil First-instance Case Catalog Rules",
+    "predicted_volume": "Main volume",
+    "predicted_second_level_directory": "Complaint and related materials",
+    "predicted_material_category": "Civil complaint",
+    "predicted_catalog_example": "Civil complaint",
+    "confidence": "high",
+    "reasoning": "Fake model selected the only matching candidate.",
+    "agent_state": "COMPLETED",
+    "trace": "./test-reports/agent-phase-two-fake-run.trace.jsonl",
+    "review_output": "./test-reports/agent-phase-two-fake-run.review.json",
+    "resume": ""
+  },
+  "review_output": null,
+  "test_command": "python -m unittest discover -s tests"
+}

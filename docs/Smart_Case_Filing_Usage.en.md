@@ -210,9 +210,9 @@ If `--output` and `--log` are not provided, the program writes default files und
 
 The current batch mode does not recurse into subdirectories.
 
-## 7. Agent Mode
+## 7. Single-file Agent Mode
 
-Agent mode is for cataloging tasks that need execution trace, low-confidence review, and resume support.
+Single-file agent mode is for cataloging tasks that need an execution trace, low-confidence review, and a minimal resume summary. It uses the same OpenAI-compatible HTTP API configuration and legacy `z-ai` fallback as the normal predictor, and reuses the existing extraction, visual analysis, text analysis, and catalog candidate rules.
 
 ```bash
 python file_directory_predictor.py ./sample.pdf \
@@ -223,7 +223,48 @@ python file_directory_predictor.py ./sample.pdf \
   --json
 ```
 
-Agent mode keeps the normal JSON output fields compatible and writes additional step traces to the JSONL file passed through `--trace`.
+Agent mode keeps the normal JSON output fields compatible and adds `agent_state`, `trace`, `review_output`, `resume`, and related agent fields.
+
+Arguments:
+
+| Argument | Meaning |
+| --- | --- |
+| `--agent` | Enables the single-file agent state machine. |
+| `--trace <path>` | Writes each execution step to a JSONL trace file. If omitted, the default is `agent_trace.jsonl` under the program directory. |
+| `--review-output <path>` | Writes a human review JSON package when the state is `NEEDS_REVIEW` or `FAILED`. |
+| `--resume <trace>` | Reads the last state from an existing trace and prints a resume summary. Phase two does not continue execution from a partial step. |
+
+Each trace JSONL line is one step record:
+
+```json
+{
+  "run_id": "agent-...",
+  "file_path": "sample.pdf",
+  "state": "TEXT_ANALYZED",
+  "tool": "analyze_text",
+  "input_summary": {},
+  "output_summary": {},
+  "error": "",
+  "created_at": 1784040000.0
+}
+```
+
+The review package contains `file_path`, `agent_state`, `confidence`, `reasoning`, `trace`, `candidate_summaries`, `llm_analysis`, `vlm_analysis`, `error`, and `created_at`. API keys and similar secrets are redacted before the file is written.
+
+Resume example:
+
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --resume ./logs/sample.trace.jsonl \
+  --json
+```
+
+Phase-two limitations:
+
+- No batch agent mode; use the regular `--batch` path for batch processing.
+- No partial resume; if the last state is not `COMPLETED`, `NEEDS_REVIEW`, or `FAILED`, the command returns an explicit failed response.
+- No tool-level retry policy yet; failures enter `FAILED` and should be inspected through the review package.
 
 ## 8. Output Fields
 
