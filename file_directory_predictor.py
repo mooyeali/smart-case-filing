@@ -49,6 +49,7 @@ import pandas as pd
 from smart_case_filing.model_client import LegacyFunctionModelClient
 from smart_case_filing.agent.legacy_tools import build_legacy_tool_registry
 from smart_case_filing.agent.review import ReviewPackageWriter, build_review_payload
+from smart_case_filing.agent.run_manager import AgentRunManager
 from smart_case_filing.agent.runner import AgentRunner
 from smart_case_filing.agent.state import AgentState, AgentTraceStore
 
@@ -1081,6 +1082,10 @@ def _run_agent_cli(args):
         _run_agent_resume(args)
         return
 
+    if args.batch:
+        _run_agent_batch_cli(args)
+        return
+
     catalog_path = Path(args.catalog)
     file_path = Path(args.file) if args.file else None
 
@@ -1118,7 +1123,15 @@ def _run_agent_cli(args):
     runner = AgentRunner(registry, trace_store)
     run_id = f"agent-{int(time.time() * 1000)}"
     result = runner.run(run_id=run_id, file_path=str(file_path))
+    output = _agent_output_from_result(result, trace_path, args.review_output or "", args.resume or "")
 
+    if output["agent_state"] in {AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value} and args.review_output:
+        ReviewPackageWriter(Path(args.review_output)).write(build_review_payload(output, str(trace_path)))
+
+    print(json.dumps(output, ensure_ascii=False, indent=2))
+
+
+def _agent_output_from_result(result: dict, trace_path: Path, review_output: str = "", resume: str = "") -> dict:
     state = result.get("state", AgentState.FAILED)
     state_value = state.value if isinstance(state, AgentState) else str(state)
     output = dict(result.get("prediction") or {})
@@ -1126,16 +1139,72 @@ def _run_agent_cli(args):
         "agent_state": state_value,
         "state": state_value,
         "trace": str(trace_path),
-        "review_output": args.review_output or "",
-        "resume": args.resume or "",
+        "review_output": review_output,
+        "resume": resume,
     })
     if result.get("error"):
         output["error"] = result["error"]
+    return output
 
-    if state_value in {AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value} and args.review_output:
-        ReviewPackageWriter(Path(args.review_output)).write(build_review_payload(output, str(trace_path)))
 
-    print(json.dumps(output, ensure_ascii=False, indent=2))
+def _agent_batch_root(args) -> Path:
+    if args.trace:
+        trace_path = Path(args.trace)
+        if trace_path.exists() and trace_path.is_dir():
+            return trace_path
+        if trace_path.suffix.lower() == ".jsonl":
+            return trace_path.with_suffix("")
+        return trace_path
+    return PROGRAM_DIR / "agent-runs"
+
+
+def _run_agent_batch_cli(args):
+    catalog_path = Path(args.catalog)
+    batch_dir = Path(args.batch)
+
+    if not batch_dir.exists() or not batch_dir.is_dir():
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": f"batch directory does not exist: {batch_dir}",
+        }, ensure_ascii=False, indent=2))
+        return
+
+    if not catalog_path.exists():
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": f"catalog does not exist: {catalog_path}",
+        }, ensure_ascii=False, indent=2))
+        return
+
+    catalog = CatalogLoader(catalog_path).load()
+    registry = build_legacy_tool_registry(catalog)
+    manager = AgentRunManager(_agent_batch_root(args))
+    manager.ensure()
+
+    files = sorted([p for p in batch_dir.iterdir() if p.is_file()])
+    for file_path in files:
+        paths = manager.paths_for(str(file_path))
+        trace_store = AgentTraceStore(paths["trace"])
+        runner = AgentRunner(registry, trace_store)
+        result = runner.run(run_id=manager.run_id, file_path=str(file_path))
+        review_path = str(paths["review"])
+        output = _agent_output_from_result(result, paths["trace"], review_path, args.resume or "")
+        paths["output"].parent.mkdir(parents=True, exist_ok=True)
+        paths["output"].write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        if output["agent_state"] in {AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value}:
+            ReviewPackageWriter(paths["review"]).write(build_review_payload(output, str(paths["trace"])))
+
+        manager.record_file(str(file_path), output, paths)
+
+    summary = manager.summary()
+    summary.update({
+        "agent_state": "BATCH_COMPLETED",
+        "state": "BATCH_COMPLETED",
+    })
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 def _run_agent_resume(args):
