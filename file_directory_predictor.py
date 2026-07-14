@@ -1077,6 +1077,10 @@ def _print_result(result: PredictionResult, as_json: bool = False):
 
 def _run_agent_cli(args):
     trace_path = Path(args.trace) if args.trace else PROGRAM_DIR / "agent_trace.jsonl"
+    if args.resume:
+        _run_agent_resume(args)
+        return
+
     catalog_path = Path(args.catalog)
     file_path = Path(args.file) if args.file else None
 
@@ -1134,6 +1138,67 @@ def _run_agent_cli(args):
     print(json.dumps(output, ensure_ascii=False, indent=2))
 
 
+def _run_agent_resume(args):
+    trace_path = Path(args.resume)
+    if not trace_path.exists():
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "trace": str(trace_path),
+            "resume": True,
+            "error": f"trace does not exist: {trace_path}",
+        }, ensure_ascii=False, indent=2))
+        return
+
+    steps = AgentTraceStore(trace_path).load()
+    if not steps:
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "trace": str(trace_path),
+            "resume": True,
+            "error": "trace is empty",
+        }, ensure_ascii=False, indent=2))
+        return
+
+    last = steps[-1]
+    if last.state in {AgentState.COMPLETED, AgentState.NEEDS_REVIEW}:
+        output = dict(last.output_summary or {})
+        output.update({
+            "agent_state": last.state.value,
+            "state": last.state.value,
+            "trace": str(trace_path),
+            "resume": True,
+            "file_path": last.file_path,
+            "run_id": last.run_id,
+        })
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        return
+
+    if last.state == AgentState.FAILED:
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "trace": str(trace_path),
+            "resume": True,
+            "file_path": last.file_path,
+            "run_id": last.run_id,
+            "error": last.error or "agent run failed",
+        }, ensure_ascii=False, indent=2))
+        return
+
+    print(json.dumps({
+        "agent_state": AgentState.FAILED.value,
+        "state": AgentState.FAILED.value,
+        "trace": str(trace_path),
+        "resume": True,
+        "file_path": last.file_path,
+        "run_id": last.run_id,
+        "reason": "partial resume is not supported in phase two",
+        "last_state": last.state.value,
+    }, ensure_ascii=False, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="基于 VLM+LLM 的文件目录推测系统",
@@ -1153,7 +1218,7 @@ def main():
     parser.add_argument("--resume", help="从已有 trace JSONL 恢复智能体任务")
     args = parser.parse_args()
 
-    if not args.file and not args.batch:
+    if not args.file and not args.batch and not (args.agent and args.resume):
         parser.error("请提供文件路径或 --batch 目录")
 
     output_path = Path(args.output) if args.output else PROGRAM_DIR / DEFAULT_OUTPUT_FILE
