@@ -53,6 +53,7 @@ from smart_case_filing.agent.run_manager import AgentRunManager
 from smart_case_filing.agent.runner import AgentRunner
 from smart_case_filing.agent.retry import RetryPolicy
 from smart_case_filing.agent.state import AgentState, AgentTraceStore
+from smart_case_filing.agent.preflight import check_model_preflight
 
 try:
     import requests
@@ -1078,6 +1079,10 @@ def _print_result(result: PredictionResult, as_json: bool = False):
 
 
 def _run_agent_cli(args):
+    if getattr(args, "agent_preflight", False):
+        print(json.dumps(check_model_preflight(), ensure_ascii=False, indent=2))
+        return
+
     trace_path = Path(args.trace) if args.trace else PROGRAM_DIR / "agent_trace.jsonl"
     if args.resume:
         _run_agent_resume(args)
@@ -1397,9 +1402,10 @@ def main():
     parser.add_argument("--agent-retry-delay", type=float, default=0.0, help="智能体重试初始等待秒数")
     parser.add_argument("--agent-retry-backoff", type=float, default=2.0, help="智能体重试退避倍率")
     parser.add_argument("--agent-retry-errors", default="", help="逗号分隔的可重试错误关键字")
+    parser.add_argument("--agent-preflight", action="store_true", help="检查智能体模型配置，不调用网络 API")
     args = parser.parse_args()
 
-    if not args.file and not args.batch and not (args.agent and args.resume):
+    if not args.file and not args.batch and not (args.agent and (args.resume or args.agent_preflight)):
         parser.error("请提供文件路径或 --batch 目录")
 
     output_path = Path(args.output) if args.output else PROGRAM_DIR / DEFAULT_OUTPUT_FILE
