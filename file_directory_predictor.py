@@ -48,7 +48,7 @@ import pandas as pd
 
 from smart_case_filing.model_client import LegacyFunctionModelClient
 from smart_case_filing.agent.legacy_tools import build_legacy_tool_registry
-from smart_case_filing.agent.review import ReviewPackageWriter
+from smart_case_filing.agent.review import ReviewPackageWriter, build_review_payload
 from smart_case_filing.agent.runner import AgentRunner
 from smart_case_filing.agent.state import AgentState, AgentTraceStore
 
@@ -1094,7 +1094,7 @@ def _run_agent_cli(args):
             "resume": args.resume or "",
         }
         if args.review_output:
-            ReviewPackageWriter(Path(args.review_output)).write(result)
+            ReviewPackageWriter(Path(args.review_output)).write(build_review_payload(result, str(trace_path)))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
@@ -1108,7 +1108,7 @@ def _run_agent_cli(args):
             "resume": args.resume or "",
         }
         if args.review_output:
-            ReviewPackageWriter(Path(args.review_output)).write(result)
+            ReviewPackageWriter(Path(args.review_output)).write(build_review_payload(result, str(trace_path)))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
@@ -1133,7 +1133,7 @@ def _run_agent_cli(args):
         output["error"] = result["error"]
 
     if state_value in {AgentState.NEEDS_REVIEW.value, AgentState.FAILED.value} and args.review_output:
-        ReviewPackageWriter(Path(args.review_output)).write(output)
+        ReviewPackageWriter(Path(args.review_output)).write(build_review_payload(output, str(trace_path)))
 
     print(json.dumps(output, ensure_ascii=False, indent=2))
 

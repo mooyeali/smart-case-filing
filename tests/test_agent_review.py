@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from smart_case_filing.agent.review import ReviewPackageWriter
+from smart_case_filing.agent.review import ReviewPackageWriter, build_review_payload
 
 
 class ReviewPackageWriterTest(unittest.TestCase):
@@ -22,6 +22,60 @@ class ReviewPackageWriterTest(unittest.TestCase):
             data = json.loads(raw)
             self.assertEqual("case.pdf", data["file_path"])
             self.assertNotIn("sk-1234567890abcdef", raw)
+
+    def test_builds_structured_review_payload(self):
+        payload = build_review_payload({
+            "agent_state": "NEEDS_REVIEW",
+            "file_path": "case.pdf",
+            "confidence": "low",
+            "reasoning": "ambiguous material",
+            "candidate_summaries": [{"material_category": "complaint"}],
+            "llm_analysis": {"available": True, "summary": "short"},
+            "vlm_analysis": {"available": False},
+        }, "trace.jsonl")
+
+        self.assertEqual("case.pdf", payload["file_path"])
+        self.assertEqual("NEEDS_REVIEW", payload["agent_state"])
+        self.assertEqual("low", payload["confidence"])
+        self.assertEqual("ambiguous material", payload["reasoning"])
+        self.assertEqual("trace.jsonl", payload["trace"])
+        self.assertEqual([{"material_category": "complaint"}], payload["candidate_summaries"])
+        self.assertEqual({"available": True, "summary": "short"}, payload["llm_analysis"])
+        self.assertEqual({"available": False}, payload["vlm_analysis"])
+        self.assertIn("error", payload)
+        self.assertIsInstance(payload["created_at"], float)
+
+    def test_builds_review_payload_from_runner_result(self):
+        payload = build_review_payload({
+            "state": "NEEDS_REVIEW",
+            "prediction": {
+                "file_path": "case.pdf",
+                "confidence": "low",
+                "reasoning": "needs human judgment",
+                "candidate_summaries": [{"material_category": "appeal"}],
+                "llm_analysis": {"available": True},
+                "vlm_analysis": {"available": True},
+            },
+        }, "trace.jsonl")
+
+        self.assertEqual("case.pdf", payload["file_path"])
+        self.assertEqual("NEEDS_REVIEW", payload["agent_state"])
+        self.assertEqual([{"material_category": "appeal"}], payload["candidate_summaries"])
+
+    def test_writer_creates_parent_directory_for_structured_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "nested" / "review.json"
+            ReviewPackageWriter(path).write(build_review_payload({
+                "agent_state": "FAILED",
+                "file_path": "case.pdf",
+                "error": "Authorization: Bearer sk-abcdef1234567890",
+            }, "trace.jsonl"))
+
+            raw = path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+            self.assertEqual("FAILED", data["agent_state"])
+            self.assertEqual("case.pdf", data["file_path"])
+            self.assertNotIn("sk-abcdef1234567890", raw)
 
 
 if __name__ == "__main__":
