@@ -262,6 +262,8 @@ Arguments:
 | `--agent-retry-errors <keywords>` | Comma-separated retryable error substrings. |
 | `--agent-preflight` | Prints model configuration status without network calls or input files. |
 | `--review-decision <json>` | Records a human review decision and updates the run manifest. |
+| `--agent-validate-run <manifest-or-run-dir>` | Validates manifest, trace, output, review, decision, and review index artifacts. |
+| `--agent-export-report <path>` | With `--agent-validate-run`, exports a Markdown or JSON audit report. |
 
 Each trace JSONL line is one step record:
 
@@ -337,11 +339,31 @@ python file_directory_predictor.py \
   --json
 ```
 
+Validate run artifacts:
+
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --agent-validate-run ./agent-runs/demo/manifest.json \
+  --agent-export-report ./agent-runs/demo/audit.md \
+  --json
+```
+
+The audit checks:
+
+- `manifest.json` exists and parses.
+- manifest status counts match file entries.
+- each file has trace and output artifacts.
+- `NEEDS_REVIEW` and `FAILED` files have review packages.
+- `reviews/index.json` covers every reviewable file.
+- recorded review decision files exist.
+
 Phase-three behavior and limitations:
 
 - Batch agent mode is supported, but still only processes direct files in the target directory.
 - Partial resume is supported; if trace summaries are insufficient to resume safely, the command returns a clear failed response.
 - Tool calls use a retry policy. The CLI can configure attempts, backoff, and retryable errors.
+- Run audit is read-only; it does not update manifest files or rerun tools.
 - Real model smoke tests require `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL`, or an available legacy `z-ai` CLI fallback.
 
 ## 8. Output Fields
