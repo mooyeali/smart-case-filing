@@ -137,6 +137,47 @@ def audit_run(manifest_or_run_dir) -> dict:
     }
 
 
+def build_run_report(audit_result: dict, format: str = "md") -> str:
+    if format == "json":
+        return json.dumps(audit_result, ensure_ascii=False, indent=2) + "\n"
+
+    lines = [
+        "# Agent Run Audit Report",
+        "",
+        f"- Valid: `{str(audit_result.get('valid', False)).lower()}`",
+        f"- Run ID: `{audit_result.get('run_id', '')}`",
+        f"- Manifest: `{audit_result.get('manifest', '')}`",
+        f"- File count: `{audit_result.get('file_count', 0)}`",
+        f"- Review count: `{audit_result.get('review_count', 0)}`",
+        f"- Decision count: `{audit_result.get('decision_count', 0)}`",
+        "",
+        "## Status Counts",
+        "",
+    ]
+    counts = audit_result.get("status_counts", {}) or {}
+    for key in ("COMPLETED", "NEEDS_REVIEW", "FAILED"):
+        lines.append(f"- {key}: `{counts.get(key, 0)}`")
+    lines.extend(["", "## Issues", ""])
+    issues = audit_result.get("issues", []) or []
+    if not issues:
+        lines.append("- None")
+    else:
+        for issue in issues:
+            location = issue.get("file_id") or issue.get("file_path") or "run"
+            lines.append(f"- `{location}`: {issue.get('message', '')}")
+    lines.extend(["", "## Files", ""])
+    files = audit_result.get("files", []) or []
+    if not files:
+        lines.append("- None")
+    else:
+        for item in files:
+            lines.append(
+                f"- `{item.get('file_id', '')}` {item.get('file_path', '')}: "
+                f"{item.get('agent_state', '')} confidence={item.get('confidence', '')}"
+            )
+    return "\n".join(lines) + "\n"
+
+
 def _review_index_path(files: list[dict], manifest_path: Path) -> Path | None:
     for item in files:
         review = item.get("review", "")

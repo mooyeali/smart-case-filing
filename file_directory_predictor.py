@@ -48,7 +48,7 @@ import pandas as pd
 
 from smart_case_filing.model_client import LegacyFunctionModelClient
 from smart_case_filing.agent.legacy_tools import build_legacy_tool_registry
-from smart_case_filing.agent.audit import audit_run
+from smart_case_filing.agent.audit import audit_run, build_run_report
 from smart_case_filing.agent.review import ReviewPackageWriter, build_review_payload
 from smart_case_filing.agent.run_manager import AgentRunManager
 from smart_case_filing.agent.runner import AgentRunner
@@ -1081,7 +1081,14 @@ def _print_result(result: PredictionResult, as_json: bool = False):
 
 def _run_agent_cli(args):
     if getattr(args, "agent_validate_run", ""):
-        print(json.dumps(audit_run(Path(args.agent_validate_run)), ensure_ascii=False, indent=2))
+        result = audit_run(Path(args.agent_validate_run))
+        if getattr(args, "agent_export_report", ""):
+            report_path = Path(args.agent_export_report)
+            report_format = "json" if report_path.suffix.lower() == ".json" else "md"
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(build_run_report(result, format=report_format), encoding="utf-8")
+            result["report"] = str(report_path)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
     if getattr(args, "review_decision", ""):
@@ -1450,6 +1457,7 @@ def main():
     parser.add_argument("--agent-preflight", action="store_true", help="检查智能体模型配置，不调用网络 API")
     parser.add_argument("--review-decision", help="写入人工复核决定 JSON，并更新 run manifest")
     parser.add_argument("--agent-validate-run", help="校验 agent run manifest 或 run 目录完整性")
+    parser.add_argument("--agent-export-report", help="与 --agent-validate-run 配合，导出 Markdown 或 JSON 审计报告")
     args = parser.parse_args()
 
     if not args.file and not args.batch and not (

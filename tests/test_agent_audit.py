@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import file_directory_predictor as fdp
-from smart_case_filing.agent.audit import audit_run
+from smart_case_filing.agent.audit import audit_run, build_run_report
 
 
 def write_json(path, data):
@@ -135,6 +135,37 @@ class AgentAuditTest(unittest.TestCase):
             data = json.loads(output_file.read_text(encoding="utf-8"))
             self.assertFalse(data["valid"])
             self.assertIn("manifest does not exist", data["issues"][0]["message"])
+
+    def test_builds_markdown_and_json_reports(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = audit_run(self.make_run(Path(tmp)))
+
+            markdown = build_run_report(result, format="md")
+            json_report = build_run_report(result, format="json")
+
+            self.assertIn("# Agent Run Audit Report", markdown)
+            self.assertIn("COMPLETED", markdown)
+            self.assertTrue(json.loads(json_report)["valid"])
+
+    def test_cli_exports_markdown_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = self.make_run(Path(tmp))
+            output_file = Path(tmp) / "audit.json"
+            report_file = Path(tmp) / "audit.md"
+            with patch.object(sys, "argv", [
+                "file_directory_predictor.py",
+                "--agent",
+                "--agent-validate-run", str(run_dir),
+                "--agent-export-report", str(report_file),
+                "--output", str(output_file),
+                "--log", str(Path(tmp) / "audit.log"),
+            ]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                fdp.main()
+
+            data = json.loads(output_file.read_text(encoding="utf-8"))
+            self.assertTrue(data["valid"])
+            self.assertEqual(str(report_file), data["report"])
+            self.assertIn("# Agent Run Audit Report", report_file.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
