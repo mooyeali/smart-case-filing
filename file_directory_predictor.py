@@ -48,6 +48,7 @@ import pandas as pd
 
 from smart_case_filing.model_client import LegacyFunctionModelClient
 from smart_case_filing.agent.legacy_tools import build_legacy_tool_registry
+from smart_case_filing.agent.audit import audit_run
 from smart_case_filing.agent.review import ReviewPackageWriter, build_review_payload
 from smart_case_filing.agent.run_manager import AgentRunManager
 from smart_case_filing.agent.runner import AgentRunner
@@ -1079,6 +1080,10 @@ def _print_result(result: PredictionResult, as_json: bool = False):
 
 
 def _run_agent_cli(args):
+    if getattr(args, "agent_validate_run", ""):
+        print(json.dumps(audit_run(Path(args.agent_validate_run)), ensure_ascii=False, indent=2))
+        return
+
     if getattr(args, "review_decision", ""):
         _run_review_decision_cli(args)
         return
@@ -1444,9 +1449,12 @@ def main():
     parser.add_argument("--agent-retry-errors", default="", help="逗号分隔的可重试错误关键字")
     parser.add_argument("--agent-preflight", action="store_true", help="检查智能体模型配置，不调用网络 API")
     parser.add_argument("--review-decision", help="写入人工复核决定 JSON，并更新 run manifest")
+    parser.add_argument("--agent-validate-run", help="校验 agent run manifest 或 run 目录完整性")
     args = parser.parse_args()
 
-    if not args.file and not args.batch and not (args.agent and (args.resume or args.agent_preflight or args.review_decision)):
+    if not args.file and not args.batch and not (
+        args.agent and (args.resume or args.agent_preflight or args.review_decision or args.agent_validate_run)
+    ):
         parser.error("请提供文件路径或 --batch 目录")
 
     output_path = Path(args.output) if args.output else PROGRAM_DIR / DEFAULT_OUTPUT_FILE

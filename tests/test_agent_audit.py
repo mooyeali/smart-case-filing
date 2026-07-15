@@ -1,8 +1,13 @@
 import json
+import contextlib
+import io
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import file_directory_predictor as fdp
 from smart_case_filing.agent.audit import audit_run
 
 
@@ -113,6 +118,23 @@ class AgentAuditTest(unittest.TestCase):
 
             self.assertFalse(result["valid"])
             self.assertIn("manifest does not exist", result["issues"][0]["message"])
+
+    def test_cli_validate_run_without_input_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_file = Path(tmp) / "audit.json"
+            log_file = Path(tmp) / "audit.log"
+            with patch.object(sys, "argv", [
+                "file_directory_predictor.py",
+                "--agent",
+                "--agent-validate-run", str(Path(tmp) / "missing"),
+                "--output", str(output_file),
+                "--log", str(log_file),
+            ]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                fdp.main()
+
+            data = json.loads(output_file.read_text(encoding="utf-8"))
+            self.assertFalse(data["valid"])
+            self.assertIn("manifest does not exist", data["issues"][0]["message"])
 
 
 if __name__ == "__main__":
