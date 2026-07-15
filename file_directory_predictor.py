@@ -47,6 +47,7 @@ from typing import Optional
 import pandas as pd
 
 from smart_case_filing.model_client import LegacyFunctionModelClient
+from smart_case_filing.agent.filing import build_filing_plan, write_filing_plan
 from smart_case_filing.agent.legacy_tools import build_legacy_tool_registry
 from smart_case_filing.agent.audit import audit_run, build_run_report
 from smart_case_filing.agent.full_chain import run_fake_full_chain
@@ -1081,6 +1082,10 @@ def _print_result(result: PredictionResult, as_json: bool = False):
 
 
 def _run_agent_cli(args):
+    if getattr(args, "agent_filing_plan", ""):
+        _run_agent_filing_cli(args)
+        return
+
     if getattr(args, "agent_full_chain_test", ""):
         print(json.dumps(run_fake_full_chain(Path(args.agent_full_chain_test)), ensure_ascii=False, indent=2))
         return
@@ -1219,6 +1224,42 @@ def _run_review_decision_cli(args):
         "state": "REVIEW_DECISION_RECORDED",
     })
     print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def _run_agent_filing_cli(args):
+    source_path = Path(args.agent_filing_plan)
+    filing_root = Path(args.agent_filing_root) if args.agent_filing_root else None
+    if not source_path.exists():
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": f"filing plan source does not exist: {source_path}",
+        }, ensure_ascii=False, indent=2))
+        return
+    if not filing_root:
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": "--agent-filing-root is required with --agent-filing-plan",
+        }, ensure_ascii=False, indent=2))
+        return
+    try:
+        plan = build_filing_plan(
+            source_path,
+            filing_root,
+            action=args.agent_filing_action,
+            apply=args.agent_filing_apply,
+        )
+        if args.agent_filing_output:
+            plan_path = write_filing_plan(plan, Path(args.agent_filing_output))
+            plan["plan_output"] = str(plan_path)
+        print(json.dumps(plan, ensure_ascii=False, indent=2))
+    except Exception as exc:
+        print(json.dumps({
+            "agent_state": AgentState.FAILED.value,
+            "state": AgentState.FAILED.value,
+            "error": str(exc),
+        }, ensure_ascii=False, indent=2))
 
 
 def _agent_batch_root(args) -> Path:
@@ -1464,11 +1505,16 @@ def main():
     parser.add_argument("--agent-validate-run", help="校验 agent run manifest 或 run 目录完整性")
     parser.add_argument("--agent-export-report", help="与 --agent-validate-run 配合，导出 Markdown 或 JSON 审计报告")
     parser.add_argument("--agent-full-chain-test", help="运行无模型依赖的智能体全链路验收，并输出到指定目录")
+    parser.add_argument("--agent-filing-plan", help="从 agent 输出 JSON 或 run manifest 生成归档计划")
+    parser.add_argument("--agent-filing-root", help="归档计划的目标根目录")
+    parser.add_argument("--agent-filing-action", choices=("copy", "move"), default="copy", help="归档执行动作，默认 copy")
+    parser.add_argument("--agent-filing-apply", action="store_true", help="执行归档计划；默认仅 dry-run")
+    parser.add_argument("--agent-filing-output", help="归档计划 JSON 保存路径")
     args = parser.parse_args()
 
     if not args.file and not args.batch and not (
         args.agent and (args.resume or args.agent_preflight or args.review_decision or args.agent_validate_run)
-        or (args.agent and args.agent_full_chain_test)
+        or (args.agent and (args.agent_full_chain_test or args.agent_filing_plan))
     ):
         parser.error("请提供文件路径或 --batch 目录")
 

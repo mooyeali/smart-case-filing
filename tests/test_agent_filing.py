@@ -1,8 +1,13 @@
+import contextlib
+import io
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+import file_directory_predictor as fdp
 from smart_case_filing.agent.filing import (
     build_filing_plan,
     sanitize_path_part,
@@ -115,6 +120,36 @@ class AgentFilingPlanTest(unittest.TestCase):
             self.assertEqual("moved", item["status"])
             self.assertTrue(Path(item["target"]).exists())
             self.assertFalse(source.exists())
+
+    def test_cli_writes_filing_plan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            source = tmp_path / "起诉状.txt"
+            source.write_text("case filing", encoding="utf-8")
+            agent_output = tmp_path / "agent-output.json"
+            write_output(agent_output, source)
+            plan_output = tmp_path / "filing-plan.json"
+            cli_output = tmp_path / "cli-output.json"
+            cli_log = tmp_path / "cli.log"
+
+            with patch.object(sys, "argv", [
+                "file_directory_predictor.py",
+                "--agent",
+                "--agent-filing-plan", str(agent_output),
+                "--agent-filing-root", str(tmp_path / "filing"),
+                "--agent-filing-output", str(plan_output),
+                "--output", str(cli_output),
+                "--log", str(cli_log),
+            ]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                fdp.main()
+
+            self.assertTrue(plan_output.exists())
+            self.assertTrue(cli_output.exists())
+            plan = json.loads(plan_output.read_text(encoding="utf-8"))
+            summary = json.loads(cli_output.read_text(encoding="utf-8"))
+            self.assertEqual("FILING_PLAN_CREATED", plan["agent_state"])
+            self.assertEqual(str(plan_output), summary["plan_output"])
+            self.assertEqual({"ready": 1}, summary["status_counts"])
 
 
 if __name__ == "__main__":
