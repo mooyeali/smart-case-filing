@@ -1,0 +1,29 @@
+{
+  "command": "python file_directory_predictor.py --agent --agent-full-chain-test ./test-reports/agent-full-chain-smoke --json",
+  "agent_state": "FULL_CHAIN_TEST_COMPLETED",
+  "generated": {
+    "input_dir": "agent-full-chain-smoke/input",
+    "run_dir": "agent-full-chain-smoke/run",
+    "manifest": "agent-full-chain-smoke/run/manifest.json",
+    "reviews": "agent-full-chain-smoke/reviews",
+    "review_index": "agent-full-chain-smoke/reviews/index.json",
+    "audit_markdown": "agent-full-chain-smoke/audit.md",
+    "audit_json": "agent-full-chain-smoke/audit.json"
+  },
+  "expected_audit": {
+    "valid": true,
+    "status_counts": {
+      "COMPLETED": 1,
+      "NEEDS_REVIEW": 1,
+      "FAILED": 1
+    },
+    "review_count": 2,
+    "decision_count": 1,
+    "issues": []
+  },
+  "test_commands": [
+    "python -m unittest tests/test_agent_full_chain_cli.py",
+    "python -m unittest discover -s tests",
+    "python file_directory_predictor.py --help"
+  ]
+}

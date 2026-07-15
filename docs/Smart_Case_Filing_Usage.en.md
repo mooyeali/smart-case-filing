@@ -264,6 +264,7 @@ Arguments:
 | `--review-decision <json>` | Records a human review decision and updates the run manifest. |
 | `--agent-validate-run <manifest-or-run-dir>` | Validates manifest, trace, output, review, decision, and review index artifacts. |
 | `--agent-export-report <path>` | With `--agent-validate-run`, exports a Markdown or JSON audit report. |
+| `--agent-full-chain-test <output-dir>` | Runs a no-model fake full-chain validation and writes complete run artifacts plus audit reports. |
 
 Each trace JSONL line is one step record:
 
@@ -357,6 +358,17 @@ The audit checks:
 - `NEEDS_REVIEW` and `FAILED` files have review packages.
 - `reviews/index.json` covers every reviewable file.
 - recorded review decision files exist.
+
+No-model full-chain validation:
+
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --agent-full-chain-test ./test-reports/agent-full-chain-smoke \
+  --json
+```
+
+This command generates a deterministic fake run: one `COMPLETED` file, one `NEEDS_REVIEW` file, one `FAILED` file, review index, review decision, Markdown audit report, and JSON audit report. It does not call real models, so it is suitable as a fast local acceptance button before handoff.
 
 Phase-three behavior and limitations:
 
