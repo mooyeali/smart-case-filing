@@ -49,6 +49,7 @@ import pandas as pd
 from smart_case_filing.model_client import LegacyFunctionModelClient
 from smart_case_filing.agent.legacy_tools import build_legacy_tool_registry
 from smart_case_filing.agent.audit import audit_run, build_run_report
+from smart_case_filing.agent.full_chain import run_fake_full_chain
 from smart_case_filing.agent.review import ReviewPackageWriter, build_review_payload
 from smart_case_filing.agent.run_manager import AgentRunManager
 from smart_case_filing.agent.runner import AgentRunner
@@ -1080,6 +1081,10 @@ def _print_result(result: PredictionResult, as_json: bool = False):
 
 
 def _run_agent_cli(args):
+    if getattr(args, "agent_full_chain_test", ""):
+        print(json.dumps(run_fake_full_chain(Path(args.agent_full_chain_test)), ensure_ascii=False, indent=2))
+        return
+
     if getattr(args, "agent_validate_run", ""):
         result = audit_run(Path(args.agent_validate_run))
         if getattr(args, "agent_export_report", ""):
@@ -1458,10 +1463,12 @@ def main():
     parser.add_argument("--review-decision", help="写入人工复核决定 JSON，并更新 run manifest")
     parser.add_argument("--agent-validate-run", help="校验 agent run manifest 或 run 目录完整性")
     parser.add_argument("--agent-export-report", help="与 --agent-validate-run 配合，导出 Markdown 或 JSON 审计报告")
+    parser.add_argument("--agent-full-chain-test", help="运行无模型依赖的智能体全链路验收，并输出到指定目录")
     args = parser.parse_args()
 
     if not args.file and not args.batch and not (
         args.agent and (args.resume or args.agent_preflight or args.review_decision or args.agent_validate_run)
+        or (args.agent and args.agent_full_chain_test)
     ):
         parser.error("请提供文件路径或 --batch 目录")
 
