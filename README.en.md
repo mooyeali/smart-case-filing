@@ -16,7 +16,7 @@ The current project is centered on a single Python script. It is suitable for lo
 - Supports OpenAI-compatible HTTP APIs through environment variables for `base_url`, `api_key`, and `model`.
 - Falls back to the legacy `z-ai` CLI when the HTTP model configuration is incomplete.
 - Can save stdout and stderr to separate files for auditing and review.
-- The auditable batch agent mode supports execution traces, run manifests, low-confidence review, partial resume, retry CLI options, model preflight, review decision records, run audit reports, and a no-model full-chain validation command.
+- The auditable batch agent mode supports execution traces, run manifests, low-confidence review, partial resume, retry CLI options, model preflight, review decision records, run audit reports, a no-model full-chain validation command, and safe filing plans.
 
 ## Workflow
 
@@ -95,6 +95,19 @@ Run batch prediction:
 ```bash
 python file_directory_predictor.py --batch ./input-files --catalog ./catalog-mapping.xlsx --json
 ```
+
+Generate an agent filing plan. The default is dry-run; it does not copy or move files:
+
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --agent-filing-plan ./agent-runs/demo/manifest.json \
+  --agent-filing-root ./filed-cases \
+  --agent-filing-output ./agent-runs/demo/filing-plan.json \
+  --json
+```
+
+Only `COMPLETED` files with non-`low` confidence become executable plan items. `NEEDS_REVIEW`, `FAILED`, low-confidence, and incomplete predictions are marked as `blocked`.
 
 Save output and logs to explicit files:
 

@@ -1,0 +1,37 @@
+{
+  "phase": "agent-phase-seven",
+  "date": "2026-07-16",
+  "feature": "auditable filing plan and safe dry-run/apply execution",
+  "commands": {
+    "focused_tests": "python -m unittest tests/test_agent_filing.py",
+    "full_regression": "python -m unittest discover -s tests",
+    "help": "python file_directory_predictor.py --help",
+    "dry_run": "python file_directory_predictor.py --agent --agent-filing-plan ./agent-runs/demo/manifest.json --agent-filing-root ./filed-cases --agent-filing-output ./agent-runs/demo/filing-plan.json --json",
+    "apply_copy": "python file_directory_predictor.py --agent --agent-filing-plan ./agent-runs/demo/manifest.json --agent-filing-root ./filed-cases --agent-filing-action copy --agent-filing-apply --agent-filing-output ./agent-runs/demo/filing-plan.applied.json --json"
+  },
+  "plan_shape": {
+    "agent_state": "FILING_PLAN_CREATED",
+    "action": "copy",
+    "apply": false,
+    "item_statuses": [
+      "ready",
+      "blocked",
+      "copied",
+      "moved"
+    ]
+  },
+  "safety_rules": [
+    "only COMPLETED files with non-low confidence can become ready",
+    "NEEDS_REVIEW, FAILED, low confidence, missing source, incomplete fields, and existing targets are blocked",
+    "dry-run is the default",
+    "apply mode never overwrites an existing target file"
+  ],
+  "coverage": [
+    "path sanitization",
+    "single output dry-run plan",
+    "manifest plan with blocked review/failed/low-confidence items",
+    "apply copy",
+    "apply move",
+    "CLI output and plan file writing"
+  ]
+}

@@ -265,6 +265,11 @@ Arguments:
 | `--agent-validate-run <manifest-or-run-dir>` | Validates manifest, trace, output, review, decision, and review index artifacts. |
 | `--agent-export-report <path>` | With `--agent-validate-run`, exports a Markdown or JSON audit report. |
 | `--agent-full-chain-test <output-dir>` | Runs a no-model fake full-chain validation and writes complete run artifacts plus audit reports. |
+| `--agent-filing-plan <json>` | Builds a filing plan from one agent output JSON or a batch run manifest. |
+| `--agent-filing-root <dir>` | Target filing root directory, used with `--agent-filing-plan`. |
+| `--agent-filing-action copy\|move` | Filing action. Default: `copy`. |
+| `--agent-filing-apply` | Applies the filing plan. Without this flag, the command is dry-run only. |
+| `--agent-filing-output <json>` | Writes the filing plan to a JSON file. |
 
 Each trace JSONL line is one step record:
 
@@ -370,12 +375,64 @@ python file_directory_predictor.py \
 
 This command generates a deterministic fake run: one `COMPLETED` file, one `NEEDS_REVIEW` file, one `FAILED` file, review index, review decision, Markdown audit report, and JSON audit report. It does not call real models, so it is suitable as a fast local acceptance button before handoff.
 
+Filing plan dry-run:
+
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --agent-filing-plan ./agent-runs/demo/manifest.json \
+  --agent-filing-root ./filed-cases \
+  --agent-filing-output ./agent-runs/demo/filing-plan.json \
+  --json
+```
+
+The filing plan converts prediction fields into a target path:
+
+```text
+<agent-filing-root>/<predicted_case_type>/<predicted_volume>/<predicted_second_level_directory>/<predicted_material_category>/<source_file_name>
+```
+
+Dry-run is the default. It only generates a plan and does not copy or move files. Main plan item fields:
+
+```json
+{
+  "source": "input/complaint.txt",
+  "target": "filed-cases/Civil First-instance/Main volume/Complaint materials/Civil complaint/complaint.txt",
+  "action": "copy",
+  "status": "ready",
+  "reason": "",
+  "agent_state": "COMPLETED",
+  "confidence": "high"
+}
+```
+
+Safety rules:
+
+- Only files with `agent_state == COMPLETED` and non-`low` confidence become `ready`.
+- `NEEDS_REVIEW`, `FAILED`, low-confidence, missing-source, incomplete-prediction, and existing-target items are `blocked`.
+- Path parts are sanitized before target paths are built.
+- `copy` or `move` runs only when `--agent-filing-apply` is explicitly provided.
+
+Apply copy:
+
+```bash
+python file_directory_predictor.py \
+  --agent \
+  --agent-filing-plan ./agent-runs/demo/manifest.json \
+  --agent-filing-root ./filed-cases \
+  --agent-filing-action copy \
+  --agent-filing-apply \
+  --agent-filing-output ./agent-runs/demo/filing-plan.applied.json \
+  --json
+```
+
 Phase-three behavior and limitations:
 
 - Batch agent mode is supported, but still only processes direct files in the target directory.
 - Partial resume is supported; if trace summaries are insufficient to resume safely, the command returns a clear failed response.
 - Tool calls use a retry policy. The CLI can configure attempts, backoff, and retryable errors.
 - Run audit is read-only; it does not update manifest files or rerun tools.
+- Filing plans only consume existing agent outputs or manifests; they do not call models again and do not change the file system unless apply is explicit.
 - Real model smoke tests require `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL`, or an available legacy `z-ai` CLI fallback.
 
 ## 8. Output Fields
