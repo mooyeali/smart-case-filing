@@ -1,0 +1,102 @@
+[加载编目规则] catalog-mapping.xlsx
+  共 3860 条规则，13 种案件类型，1135 种材料类别
+
+[处理] 25-4841上诉费.png.png
+[AI_DEBUG] HTTP 400: {"error":{"message":"***.BadRequestError: OpenAIException - {\"error\":{\"message\":\"Failed to load image: cannot identify image file \u003c_io.BytesIO object\u003e\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}","type":"upstream_error","param":"","code":"400"}}
+
+[处理] 25-4841附件2上 诉 案 件 移 送 函_083800.pdf.pdf
+
+[处理] 上诉状-上诉状.pdf.pdf
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 二审受理案件通知书（王海鹏）.doc
+
+[处理] 传票（王慧）.doc
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 传票（王海鹏）.doc
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+
+[处理] 原审判决书.pdf
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 参加诉讼通知书（第三人）.doc
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1028)')))
+
+[处理] 合议庭组成人员通知书（王慧）.doc
+
+[处理] 合议庭组成人员通知书（王海鹏）.doc
+
+[处理] 应诉通知书（王慧）.doc
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+
+[处理] 当事人身份证明-王慧身份证.pdf.pdf
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 当事人身份证明-王海鹏身份证.pdf.pdf
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 授权委托书及代理人身份证明-出庭函.jpg.jpg
+[AI_DEBUG] HTTP 400: {"error":{"message":"***.BadRequestError: OpenAIException - {\"error\":{\"message\":\"Failed to load image: cannot identify image file \u003c_io.BytesIO object\u003e\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}","type":"upstream_error","param":"","code":"400"}}
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+
+[处理] 授权委托书及代理人身份证明-出庭函.pdf.pdf
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 授权委托书及代理人身份证明-委托书.pdf.pdf
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 授权委托书及代理人身份证明-执业证PDF.pdf.pdf
+
+[处理] 民事诉讼风险提示书.doc
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 王海鹏_上诉案件交纳诉讼费通知书.pdf.pdf.pdf
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 电子送达确认书.pdf-王慧(39-39).pdf.pdf
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+
+[处理] 立案管理审查、审判流程管理信息表.pdf
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+[AI_DEBUG] HTTP 503: {"error":{"message":"system memory overloaded","type":"AgnesAI_error","param":"","code":"system_memory_overloaded"}}
+
+[处理] 第2次开庭庭审笔录.doc
+
+[处理] 证据目录及证据材料-车辆信息.jpg.jpg
+[AI_DEBUG] HTTP 400: {"error":{"message":"***.BadRequestError: OpenAIException - {\"error\":{\"message\":\"Failed to load image: cannot identify image file \u003c_io.BytesIO object\u003e\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}","type":"upstream_error","param":"","code":"400"}}
+
+[处理] 证据目录及证据材料-车辆照片.jpg.jpg
+[AI_DEBUG] HTTP 400: {"error":{"message":"***.BadRequestError: OpenAIException - {\"error\":{\"message\":\"Failed to load image: cannot identify image file \u003c_io.BytesIO object\u003e\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}","type":"upstream_error","param":"","code":"400"}}
+
+[处理] 送达回证(短信)_王慧_20260113.pdf.pdf
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))
+
+[处理] 送达回证(短信)_王慧_20260126.pdf.pdf
+
+[处理] 送达回证(短信)_王慧_20260305.pdf
+
+[处理] 送达回证(短信)_王慧_20260310.pdf
+
+[处理] 送达回证(短信)_王慧_20260312.pdf
+
+[处理] 送达回证(短信)_王海鹏_20260113.pdf.pdf
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1028)')))
+
+[处理] 送达回证(短信)_王海鹏_20260126.pdf.pdf
+
+[处理] 送达回证(短信)_王海鹏_20260305.pdf
+
+[处理] 送达回证(短信)_王海鹏_20260310.pdf
+[AI_DEBUG] HTTP 400: {"error":{"message":"***.BadRequestError: OpenAIException - {\"error\":{\"message\":\"Failed to load image: cannot identify image file \u003c_io.BytesIO object\u003e\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}","type":"upstream_error","param":"","code":"400"}}
+[AI_DEBUG] request failed: HTTPSConnectionPool(host='apihub.agnes-ai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1028)')))
+
+[处理] 送达回证(短信)_王海鹏_20260312.pdf
+
+[处理] 送达地址确认书-栾志.pdf.pdf
